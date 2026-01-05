@@ -3,7 +3,7 @@
 on:
   push:
     branches:
-      - dev
+      - edbwe_dev
       - non-prod
       - prod
     paths-ignore:
@@ -13,7 +13,7 @@ on:
       - "*.config.js"
 
   pull_request:
-    branches: [ dev ]
+    branches: [ edbwe_dev ]
     types: [closed]
     paths-ignore:
       - "**/*.md"
@@ -50,12 +50,12 @@ jobs:
               echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
             fi
           elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
-            ENVIRONMENT="dev"
-            echo "ENVIRONMENT=dev" >> $GITHUB_OUTPUT
+            ENVIRONMENT="edbwe_dev"
+            echo "ENVIRONMENT=edbwe_dev" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             BRANCH="${{ github.ref_name }}"
             case $BRANCH in
-              "dev") ENVIRONMENT="dev" ;;
+              "edbwe_dev") ENVIRONMENT="edbwe_dev" ;;
               "non-prod") ENVIRONMENT="non-prod" ;;
               "prod") ENVIRONMENT="prod" ;;
               *) echo "❌ Unknown branch: $BRANCH"; exit 1 ;;
@@ -78,12 +78,12 @@ jobs:
         uses: actions/checkout@v4
 
       # Configure AWS credentials for each target environment
-      - name: 🔐 Configure AWS credentials (Dev)
+      - name: 🔐 Configure AWS credentials (edbwe_dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.DISCOVERY_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DISCOVERY_AWS_REGION }}
-        if: ${{ needs.dispatch.outputs.environment == 'dev' }}
+        if: ${{ needs.dispatch.outputs.environment == 'edbwe_dev' }}
 
       - name: 🔐 Configure AWS credentials (Non-Prod)
         uses: aws-actions/configure-aws-credentials@v4
@@ -111,7 +111,7 @@ jobs:
 
           # Determine environment-specific settings
           case "$ENVIRONMENT" in
-            dev)
+            edbwe_dev)
               AWS_ACCOUNT_ID='${{ secrets.DISCOVERY_AWS_ACCOUNT_ID }}'
               REGION='${{ secrets.DISCOVERY_AWS_REGION }}'
               CUBE_REPO='${{ secrets.DISCOVERY_CUBE_ECR_REPO }}'
@@ -139,7 +139,7 @@ jobs:
 
           # Create repo if not exists
           for REPO in "$CUBE_REPO" "$CUBESTORE_REPO"; do
-            if ! aws ecr describe-repositories --repository-names "$REPO" >/dev/null 2>&1; then
+            if ! aws ecr describe-repositories --repository-names "$REPO" >/edbwe_dev/null 2>&1; then
               echo "📦 Creating ECR repository: $REPO"
               aws ecr create-repository --repository-name "$REPO" --image-scanning-configuration scanOnPush=true
             fi
