@@ -1,45 +1,45 @@
-name: Build Docker Images (Test Only)
+# name: Build Docker Images (Test Only)
 
-on:
-  pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'docker-images/**'
-      - 'cubejs/**'
+# on:
+#   pull_request:
+#     branches: [ main, develop ]
+#     paths:
+#       - 'docker-images/**'
+#       - 'cubejs/**'
 
-jobs:
-  test-build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        component: 
-          - name: cube-api
-            dockerfile: docker-images/cube-api/Dockerfile
-          - name: cube-refresh-worker
-            dockerfile: docker-images/cube-refresh-worker/Dockerfile
-          - name: cubestore-router
-            dockerfile: docker-images/cubestore-router/Dockerfile
-          - name: cubestore-worker
-            dockerfile: docker-images/cubestore-worker/Dockerfile
+# jobs:
+#   test-build:
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix:
+#         component: 
+#           - name: cube-api
+#             dockerfile: docker-images/cube-api/Dockerfile
+#           - name: cube-refresh-worker
+#             dockerfile: docker-images/cube-refresh-worker/Dockerfile
+#           - name: cubestore-router
+#             dockerfile: docker-images/cubestore-router/Dockerfile
+#           - name: cubestore-worker
+#             dockerfile: docker-images/cubestore-worker/Dockerfile
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+#     steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+#     - name: Set up Docker Buildx
+#       uses: docker/setup-buildx-action@v3
 
-    - name: Build Docker image (test only)
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ${{ matrix.component.dockerfile }}
-        push: false
-        tags: test/${{ matrix.component.name }}:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+#     - name: Build Docker image (test only)
+#       uses: docker/build-push-action@v5
+#       with:
+#         context: .
+#         file: ${{ matrix.component.dockerfile }}
+#         push: false
+#         tags: test/${{ matrix.component.name }}:${{ github.sha }}
+#         cache-from: type=gha
+#         cache-to: type=gha,mode=max
 
-    - name: Test image
-      run: |
-        docker run --rm test/${{ matrix.component.name }}:${{ github.sha }} --version || true
-        echo "✅ ${{ matrix.component.name }} built successfully"
+#     - name: Test image
+#       run: |
+#         docker run --rm test/${{ matrix.component.name }}:${{ github.sha }} --version || true
+#         echo "✅ ${{ matrix.component.name }} built successfully"
