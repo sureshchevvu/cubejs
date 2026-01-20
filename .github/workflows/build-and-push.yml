@@ -201,13 +201,13 @@ jobs:
             dev)
               AWS_ACCOUNT_ID='${{ secrets.DEV_AWS_ACCOUNT_ID }}'
               REGION='${{ secrets.DEV_AWS_REGION }}'
-              ECR_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
+              ECR_REPO='dev-cubejs'
               if [[ "$COMPONENT_NAME" == "cube-refresh-worker" ]]; then
-                ECR_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
+                ECR_REPO='dev-cubejs-refresh-worker'
               elif [[ "$COMPONENT_NAME" == "cubestore-router" ]]; then
-                ECR_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
+                ECR_REPO='dev-cubestore-router'
               elif [[ "$COMPONENT_NAME" == "cubestore-worker" ]]; then
-                ECR_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+                ECR_REPO='dev-cubestore-worker'
               fi
               ;;
             non-prod)
@@ -422,19 +422,19 @@ jobs:
               ECS_CLUSTER='${{ secrets.DEV_ECS_CLUSTER_NAME }}'
               case "$COMPONENT" in
                 cube-api)
-                  ECR_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
+                  ECR_REPO='dev-cubejs'
                   ECS_SERVICE='${{ secrets.DEV_CUBE_API_ECS_SERVICE }}'
                   ;;
                 cube-refresh-worker)
-                  ECR_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
+                  ECR_REPO='dev-cubejs-refresh-worker'
                   ECS_SERVICE='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
                   ;;
                 cubestore-router)
-                  ECR_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
+                  ECR_REPO='dev-cubestore-router'
                   ECS_SERVICE='${{ secrets.DEV_CUBESTORE_ROUTER_ECS_SERVICE }}'
                   ;;
                 cubestore-worker)
-                  ECR_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+                  ECR_REPO='dev-cubestore-worker'
                   ECS_SERVICE='${{ secrets.DEV_CUBESTORE_WORKER_ECS_SERVICE }}'
                   ;;
               esac
@@ -758,13 +758,13 @@ jobs:
             dev)
               AWS_ACCOUNT_ID='${{ secrets.DEV_AWS_ACCOUNT_ID }}'
               REGION='${{ secrets.DEV_AWS_REGION }}'
-              ECR_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
+              ECR_REPO='dev-cubejs'
               if [[ "$COMPONENT" == "cube-refresh-worker" ]]; then
-                ECR_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
+                ECR_REPO='dev-cubejs-refresh-worker'
               elif [[ "$COMPONENT" == "cubestore-router" ]]; then
-                ECR_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
+                ECR_REPO='dev-cubestore-router'
               elif [[ "$COMPONENT" == "cubestore-worker" ]]; then
-                ECR_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+                ECR_REPO='dev-cubestore-worker'
               fi
               ;;
             non-prod)
@@ -925,10 +925,10 @@ jobs:
           # Get ECR repo names based on environment
           case "$ENVIRONMENT" in
             dev)
-              CUBE_API_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
-              CUBE_REFRESH_WORKER_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
-              CUBESTORE_ROUTER_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
-              CUBESTORE_WORKER_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+              CUBE_API_REPO='dev-cubejs'
+              CUBE_REFRESH_WORKER_REPO='dev-cubejs-refresh-worker'
+              CUBESTORE_ROUTER_REPO='dev-cubestore-router'
+              CUBESTORE_WORKER_REPO='dev-cubestore-worker'
               ;;
             non-prod)
               CUBE_API_REPO='${{ secrets.NP_CUBE_API_ECR_REPO }}'
