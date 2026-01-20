@@ -404,7 +404,6 @@ jobs:
           AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
-        if: ${{ needs.dispatch.outputs.environment == 'prod' }}
 
       - name: 🔑 Retrieve Secrets from AWS Secrets Manager
         id: get-secrets
