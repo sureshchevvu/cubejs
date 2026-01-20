@@ -20,6 +20,41 @@ jobs:
           echo "Ref: ${{ github.ref }}"
           echo "Branch: ${{ github.ref_name }}"
           echo "Testing OIDC authentication..."
+      
+      - name: 🔍 Debug OIDC Token Claims
+        run: |
+          echo "=== GitHub OIDC Token Analysis ==="
+          echo "Expected sub claim: repo:${{ github.repository }}:ref:${{ github.ref }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository Owner: ${{ github.repository_owner }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "SHA: ${{ github.sha }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Job: ${{ github.job }}"
+          echo ""
+          echo "Trust policy expects one of these patterns:"
+          echo "- repo:sureshchevvu/cubejs:*"
+          echo "- repo:sureshchevvu/cube:*"
+          echo ""
+          echo "Current token should match: repo:sureshchevvu/cubejs:*"
+          
+      - name: 🧪 Test Alternative OIDC Configuration
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          aws-region: us-east-1
+        continue-on-error: true
+        id: alt-auth
+        
+      - name: 📊 Alternative Test Result
+        run: |
+          if [ "${{ steps.alt-auth.outcome }}" = "success" ]; then
+            echo "✅ Alternative config worked!"
+          else
+            echo "❌ Alternative config also failed"
+          fi
     
       - name: Test Direct OIDC
         uses: aws-actions/configure-aws-credentials@v4
