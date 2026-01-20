@@ -79,8 +79,26 @@ jobs:
           echo "Waiting 3 seconds for token stabilization..."
           sleep 3
           echo "Ready for authentication attempt"
-      
-      - name: �🔐 Configure AWS credentials (Dev)
+            - name: 🔍 Validate Repository Secrets
+        run: |
+          echo "=== Repository Secret Validation ==="
+          if [ -z "$DEV_ROLE" ]; then
+            echo "❌ CRITICAL: DEV_AWS_ROLE_TO_ASSUME secret is NOT SET or EMPTY"
+            exit 1
+          else
+            echo "✅ DEV_AWS_ROLE_TO_ASSUME: ${DEV_ROLE:0:50}..."
+          fi
+          if [ -z "$DEV_REGION" ]; then
+            echo "❌ CRITICAL: DEV_AWS_REGION secret is NOT SET or EMPTY"
+            exit 1
+          else
+            echo "✅ DEV_AWS_REGION: $DEV_REGION"
+          fi
+          echo "=== Secrets validation complete ==="
+        env:
+          DEV_ROLE: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
+          DEV_REGION: ${{ secrets.DEV_AWS_REGION }}
+            - name: �🔐 Configure AWS credentials (Dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}

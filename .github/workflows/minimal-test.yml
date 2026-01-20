@@ -1,0 +1,24 @@
+name: Minimal OIDC Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  minimal-test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Test Direct OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          aws-region: us-east-1
+          audience: sts.amazonaws.com
+      
+      - name: Verify Success
+        run: |
+          aws sts get-caller-identity
+          echo "✅ Direct OIDC authentication successful!"
