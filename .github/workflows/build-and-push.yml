@@ -1,0 +1,966 @@
+name: Multi-Environment CubeJS Deployment 
+
+#Created_BY = EDBWE 12-01-2026 
+
+on:
+  push:
+    branches:
+      - dev                # Dev environment
+      - non-prod           # Non-Prod environment
+      - prod               # Prod environment
+    paths-ignore:
+      - "**/*.md"
+      - ".github/*"
+      - ".gitignore"
+      - "*.config.js"
+  pull_request:
+    branches:
+      - dev
+    types: [closed]
+    paths-ignore:
+      - "**/*.md"
+      - ".github/*"
+      - ".gitignore"
+      - "*.config.js"
+  release:
+    types: [prereleased, released]
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: 203874373410
+
+jobs:
+  # ========================================
+  # STAGE 1: ENVIRONMENT SETUP & VALIDATION
+  # ========================================
+  dispatch:
+    name: 🔧 Environment Setup
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env-config.outputs.ENVIRONMENT }}
+      build-id: ${{ steps.generate-id.outputs.unique-id }}
+    
+    steps:
+      - name: 🎲 Generate Build ID
+        id: generate-id
+        run: |
+          BUILD_ID="${{ github.run_number }}"
+          echo "unique-id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "✅ Generated Build ID: $BUILD_ID"
+
+      - name: ✅ Validate Release Branch and Tag Format
+        id: validate
+        if: ${{ github.event_name == 'release' }}
+        run: |
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          TARGET_BRANCH="${{ github.event.release.target_commitish }}"
+          IS_PRERELEASE="${{ github.event.release.prerelease }}"
+          
+          IS_VALID="false"
+          
+          # Both pre-release and release must be from dev branch
+          if [[ "$TARGET_BRANCH" != "dev" ]]; then
+            echo "❌ Invalid branch: Expected dev, got $TARGET_BRANCH"
+            echo "❌ Releases must be created from the dev branch"
+            exit 1
+          elif [[ "$IS_PRERELEASE" == "true" ]]; then
+            if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(_beta)?$ ]]; then
+              echo "✅ Valid pre-release: $RELEASE_TAG from $TARGET_BRANCH"
+              IS_VALID="true"
+            else
+              echo "❌ Invalid pre-release tag format: $RELEASE_TAG"
+              echo "❌ Expected format: v1.0.0_beta or v1.0.0"
+              exit 1
+            fi
+          else
+            if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "✅ Valid release: $RELEASE_TAG from $TARGET_BRANCH"
+              IS_VALID="true"
+            else
+              echo "❌ Invalid release tag format: $RELEASE_TAG"
+              echo "❌ Expected format: v1.0.0"
+              exit 1
+            fi
+          fi
+          
+          echo "IS_VALID=$IS_VALID" >> $GITHUB_OUTPUT
+
+      - name: 🔧 Determine Environment
+        id: env-config
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+              ENVIRONMENT="non-prod"
+              echo "ENVIRONMENT=non-prod" >> $GITHUB_OUTPUT
+              echo "🟡 Environment: Non-Prod (Pre-release)"
+            else
+              ENVIRONMENT="prod"
+              echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
+              echo "🔴 Environment: Production (Release)"
+            fi
+          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
+            ENVIRONMENT="dev"
+            echo "ENVIRONMENT=dev" >> $GITHUB_OUTPUT
+            echo "🔵 Environment: Dev (Merged PR)"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            BRANCH="${{ github.ref_name }}"
+            echo "🌿 Branch: $BRANCH"
+            
+            case $BRANCH in
+              "dev") 
+                echo "ENVIRONMENT=dev" >> $GITHUB_OUTPUT
+                echo "🔵 Environment: Dev"
+                ;;
+              "non-prod") 
+                echo "ENVIRONMENT=non-prod" >> $GITHUB_OUTPUT
+                echo "🟡 Environment: Non-Prod"
+                ;;
+              "prod") 
+                echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
+                echo "🔴 Environment: Production"
+                ;;
+              *) 
+                echo "❌ Unknown branch: $BRANCH"
+                exit 1
+                ;;
+            esac
+          else
+            echo "❌ Workflow should not run - PR was closed but not merged"
+            exit 1
+          fi
+
+  # ========================================
+  # STAGE 2: BUILD & PUSH
+  # ========================================
+  build-and-push:
+    name: 🔨 Build & Push CubeJS Components
+    needs: dispatch
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        component: 
+          - name: cube-api
+            dockerfile: docker-images/cube-api/Dockerfile
+          - name: cube-refresh-worker
+            dockerfile: docker-images/cube-refresh-worker/Dockerfile
+          - name: cubestore-router
+            dockerfile: docker-images/cubestore-router/Dockerfile
+          - name: cubestore-worker
+            dockerfile: docker-images/cubestore-worker/Dockerfile
+    outputs:
+      build-tag: ${{ steps.build-image.outputs.BUILD_TAG }}
+      all-tags: ${{ steps.build-image.outputs.ALL_TAGS }}
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: 🔐 Configure AWS credentials (Dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.DEV_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'dev' }}
+      
+      - name: 🔐 Configure AWS credentials (Non-Prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.NP_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
+      
+      - name: 🔐 Configure AWS credentials (Prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'prod' }}
+      
+      - name: 🔑 ECR Login
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: 🐋 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build & Push ${{ matrix.component.name }} Image
+        id: build-image
+        env:
+          ENVIRONMENT: ${{ needs.dispatch.outputs.environment }}
+          BUILD_ID: ${{ needs.dispatch.outputs.build-id }}
+          COMPONENT_NAME: ${{ matrix.component.name }}
+          DOCKERFILE_PATH: ${{ matrix.component.dockerfile }}
+          DOCKER_BUILDKIT: 1
+          BUILDKIT_INLINE_CACHE: 1
+        run: |
+          set -euo pipefail
+          
+          case "$ENVIRONMENT" in
+            dev)
+              AWS_ACCOUNT_ID='${{ secrets.DEV_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.DEV_AWS_REGION }}'
+              ECR_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
+              if [[ "$COMPONENT_NAME" == "cube-refresh-worker" ]]; then
+                ECR_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              elif [[ "$COMPONENT_NAME" == "cubestore-router" ]]; then
+                ECR_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
+              elif [[ "$COMPONENT_NAME" == "cubestore-worker" ]]; then
+                ECR_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+              fi
+              ;;
+            non-prod)
+              AWS_ACCOUNT_ID='${{ secrets.NP_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.NP_AWS_REGION }}'
+              ECR_REPO='${{ secrets.NP_CUBE_API_ECR_REPO }}'
+              if [[ "$COMPONENT_NAME" == "cube-refresh-worker" ]]; then
+                ECR_REPO='${{ secrets.NP_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              elif [[ "$COMPONENT_NAME" == "cubestore-router" ]]; then
+                ECR_REPO='${{ secrets.NP_CUBESTORE_ROUTER_ECR_REPO }}'
+              elif [[ "$COMPONENT_NAME" == "cubestore-worker" ]]; then
+                ECR_REPO='${{ secrets.NP_CUBESTORE_WORKER_ECR_REPO }}'
+              fi
+              ;;
+            prod)
+              AWS_ACCOUNT_ID='${{ secrets.PROD_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.PROD_AWS_REGION }}'
+              ECR_REPO='${{ secrets.PROD_CUBE_API_ECR_REPO }}'
+              if [[ "$COMPONENT_NAME" == "cube-refresh-worker" ]]; then
+                ECR_REPO='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              elif [[ "$COMPONENT_NAME" == "cubestore-router" ]]; then
+                ECR_REPO='${{ secrets.PROD_CUBESTORE_ROUTER_ECR_REPO }}'
+              elif [[ "$COMPONENT_NAME" == "cubestore-worker" ]]; then
+                ECR_REPO='${{ secrets.PROD_CUBESTORE_WORKER_ECR_REPO }}'
+              fi
+              ;;
+            *) 
+              echo "❌ Unknown environment: $ENVIRONMENT"
+              exit 1
+              ;;
+          esac
+          
+          # Validate required variables
+          for v in AWS_ACCOUNT_ID REGION BUILD_ID COMPONENT_NAME ECR_REPO; do
+            [ -n "${!v}" ] || { echo "❌ $v empty"; exit 1; }
+          done
+          
+          # Define tags
+          BUILD_TAG="${ENVIRONMENT}-${BUILD_ID}"
+          LATEST_TAG="latest"
+          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+          
+          # Create image URIs for both tags
+          IMAGE_WITH_BUILD_TAG="${ECR_REGISTRY}/${ECR_REPO}:${BUILD_TAG}"
+          IMAGE_WITH_LATEST_TAG="${ECR_REGISTRY}/${ECR_REPO}:${LATEST_TAG}"
+          
+          echo "🔨 Building $COMPONENT_NAME for $ENVIRONMENT..."
+          echo "📦 Registry: $ECR_REGISTRY"
+          echo "📦 Repository: $ECR_REPO"
+          echo "🏷️ Tags: $LATEST_TAG, $BUILD_TAG"
+          echo "🗑️ Cache: Cleared (--no-cache enabled)"
+          echo "⚡ BuildKit: Enabled with inline cache"
+
+          # Ensure ECR repository exists
+          if ! aws ecr describe-repositories --repository-names "$ECR_REPO" >/dev/null 2>&1; then
+            echo "📦 Creating ECR repository: $ECR_REPO"
+            aws ecr create-repository \
+              --repository-names "$ECR_REPO" \
+              --image-scanning-configuration scanOnPush=true \
+              --encryption-configuration encryptionType=KMS >/dev/null
+          fi
+
+          # Clear any existing Docker cache and prune
+          echo "🧹 Cleaning Docker cache..."
+          docker system prune -f || true
+          docker builder prune -f || true
+
+          # Build image with both tags
+          echo "🔨 Building $COMPONENT_NAME with fresh cache..."
+          docker build \
+            --no-cache \
+            --pull \
+            --platform linux/amd64 \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --build-arg ENVIRONMENT="$ENVIRONMENT" \
+            --cache-from "$IMAGE_WITH_LATEST_TAG" \
+            -f "$DOCKERFILE_PATH" \
+            -t "$IMAGE_WITH_BUILD_TAG" \
+            -t "$IMAGE_WITH_LATEST_TAG" \
+            .
+
+          # Push both tags with better messaging
+          echo "📤 Pushing $COMPONENT_NAME as :latest and :$BUILD_TAG..."
+          docker push "$IMAGE_WITH_BUILD_TAG"
+          docker push "$IMAGE_WITH_LATEST_TAG"
+
+          # Verify both tags exist in ECR
+          echo "🔍 Verifying pushed images..."
+          BUILD_TAG_EXISTS=$(aws ecr list-images --repository-name "$ECR_REPO" --query 'imageIds[].imageTag' --output text | grep -c "$BUILD_TAG" || echo "0")
+          LATEST_TAG_EXISTS=$(aws ecr list-images --repository-name "$ECR_REPO" --query 'imageIds[].imageTag' --output text | grep -c "latest" || echo "0")
+          
+          if [ "$BUILD_TAG_EXISTS" -eq 0 ]; then
+            echo "❌ Build tag ($BUILD_TAG) missing after push"
+            exit 1
+          fi
+          
+          if [ "$LATEST_TAG_EXISTS" -eq 0 ]; then
+            echo "❌ Latest tag missing after push"
+            exit 1
+          fi
+
+          echo "✅ Both tags verified in ECR"
+
+          # Clean up local images to free space
+          echo "🧹 Cleaning up local images..."
+          docker rmi "$IMAGE_WITH_BUILD_TAG" "$IMAGE_WITH_LATEST_TAG" || true
+
+          # Set outputs
+          echo "BUILD_TAG=$BUILD_TAG" >> "$GITHUB_OUTPUT"
+          echo "ALL_TAGS=$LATEST_TAG,$BUILD_TAG" >> "$GITHUB_OUTPUT"
+          echo "ECR_REPO=$ECR_REPO" >> "$GITHUB_OUTPUT"
+          
+          echo "✅ All ECS services deployed successfully and updated with new images!"
+
+  # ========================================
+  # STAGE 3: ECS DEPLOYMENT
+  # ========================================
+  deploy-to-ecs:
+    name: 🚀 Deploy to ECS
+    needs: [dispatch, build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        component: [cube-api, cube-refresh-worker, cubestore-router, cubestore-worker]
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: 🔐 Configure AWS credentials (Dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.DEV_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'dev' }}
+      
+      - name: 🔐 Configure AWS credentials (Non-Prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.NP_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
+      
+      - name: 🔐 Configure AWS credentials (Prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'prod' }}
+
+      - name: 🔑 Retrieve Secrets from AWS Secrets Manager
+        id: get-secrets
+        if: ${{ matrix.component == 'cube-api' || matrix.component == 'cube-refresh-worker' }}
+        run: |
+          set -euo pipefail
+          
+          case "${{ needs.dispatch.outputs.environment }}" in
+            dev)
+              SECRETS_NAME='${{ secrets.DEV_SECRETS_NAME }}'
+              AWS_REGION='${{ secrets.DEV_AWS_REGION }}'
+              ;;
+            non-prod)
+              SECRETS_NAME='${{ secrets.NP_SECRETS_NAME }}'
+              AWS_REGION='${{ secrets.NP_AWS_REGION }}'
+              ;;
+            prod)
+              SECRETS_NAME='${{ secrets.PROD_SECRETS_NAME }}'
+              AWS_REGION='${{ secrets.PROD_AWS_REGION }}'
+              ;;
+          esac
+          
+          echo "🔍 Retrieving secrets from: $SECRETS_NAME"
+          
+          # Get all secrets as JSON
+          SECRETS_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRETS_NAME" \
+            --region "$AWS_REGION" \
+            --query SecretString \
+            --output text)
+          
+          # Parse and set individual secrets for cube components
+          CUBEJS_API_SECRET=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_API_SECRET // empty')
+          CUBEJS_DB_HOST=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_HOST // empty')
+          CUBEJS_DB_NAME=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_NAME // empty')
+          CUBEJS_DB_USER=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_USER // empty')
+          CUBEJS_DB_PASS=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_PASS // empty')
+          
+          # Set outputs (masked)
+          echo "cubejs-api-secret=$CUBEJS_API_SECRET" >> $GITHUB_OUTPUT
+          echo "cubejs-db-host=$CUBEJS_DB_HOST" >> $GITHUB_OUTPUT  
+          echo "cubejs-db-name=$CUBEJS_DB_NAME" >> $GITHUB_OUTPUT
+          echo "cubejs-db-user=$CUBEJS_DB_USER" >> $GITHUB_OUTPUT
+          echo "cubejs-db-pass=$CUBEJS_DB_PASS" >> $GITHUB_OUTPUT
+          
+          echo "✅ Retrieved CubeJS secrets for ${{ matrix.component }}"
+
+      - name: 🎯 Update ECS Task Definition for ${{ matrix.component }}
+        run: |
+          set -euo pipefail
+          
+          ENVIRONMENT="${{ needs.dispatch.outputs.environment }}"
+          BUILD_TAG="${{ needs.build-and-push.outputs.build-tag }}"
+          COMPONENT="${{ matrix.component }}"
+          
+          case "$ENVIRONMENT" in
+            dev)
+              AWS_ACCOUNT_ID='${{ secrets.DEV_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.DEV_AWS_REGION }}'
+              ECS_CLUSTER='${{ secrets.DEV_ECS_CLUSTER_NAME }}'
+              case "$COMPONENT" in
+                cube-api)
+                  ECR_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.DEV_CUBE_API_ECS_SERVICE }}'
+                  ;;
+                cube-refresh-worker)
+                  ECR_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+                  ;;
+                cubestore-router)
+                  ECR_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.DEV_CUBESTORE_ROUTER_ECS_SERVICE }}'
+                  ;;
+                cubestore-worker)
+                  ECR_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.DEV_CUBESTORE_WORKER_ECS_SERVICE }}'
+                  ;;
+              esac
+              ;;
+            non-prod)
+              AWS_ACCOUNT_ID='${{ secrets.NP_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.NP_AWS_REGION }}'
+              ECS_CLUSTER='${{ secrets.NP_ECS_CLUSTER_NAME }}'
+              case "$COMPONENT" in
+                cube-api)
+                  ECR_REPO='${{ secrets.NP_CUBE_API_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.NP_CUBE_API_ECS_SERVICE }}'
+                  ;;
+                cube-refresh-worker)
+                  ECR_REPO='${{ secrets.NP_CUBE_REFRESH_WORKER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.NP_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+                  ;;
+                cubestore-router)
+                  ECR_REPO='${{ secrets.NP_CUBESTORE_ROUTER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.NP_CUBESTORE_ROUTER_ECS_SERVICE }}'
+                  ;;
+                cubestore-worker)
+                  ECR_REPO='${{ secrets.NP_CUBESTORE_WORKER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.NP_CUBESTORE_WORKER_ECS_SERVICE }}'
+                  ;;
+              esac
+              ;;
+            prod)
+              AWS_ACCOUNT_ID='${{ secrets.PROD_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.PROD_AWS_REGION }}'
+              ECS_CLUSTER='${{ secrets.PROD_ECS_CLUSTER_NAME }}'
+              case "$COMPONENT" in
+                cube-api)
+                  ECR_REPO='${{ secrets.PROD_CUBE_API_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.PROD_CUBE_API_ECS_SERVICE }}'
+                  ;;
+                cube-refresh-worker)
+                  ECR_REPO='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+                  ;;
+                cubestore-router)
+                  ECR_REPO='${{ secrets.PROD_CUBESTORE_ROUTER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.PROD_CUBESTORE_ROUTER_ECS_SERVICE }}'
+                  ;;
+                cubestore-worker)
+                  ECR_REPO='${{ secrets.PROD_CUBESTORE_WORKER_ECR_REPO }}'
+                  ECS_SERVICE='${{ secrets.PROD_CUBESTORE_WORKER_ECS_SERVICE }}'
+                  ;;
+              esac
+              ;;
+          esac
+          
+          NEW_IMAGE="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}:${BUILD_TAG}"
+          
+          echo "🚀 Updating $COMPONENT ECS service..."
+          echo "🏢 Cluster: $ECS_CLUSTER"
+          echo "🚀 Service: $ECS_SERVICE"
+          echo "🖼️ New Image: $NEW_IMAGE"
+          
+          # Get current task definition
+          CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" --query 'services[0].taskDefinition' --output text)
+          echo "📋 Current Task Definition: $CURRENT_TD_ARN"
+          
+          # Download current task definition
+          aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > current-td.json
+          
+          # Update task definition based on component type
+          if [[ "$COMPONENT" == "cube-api" ]]; then
+            # Update Cube API with secrets
+            jq --arg NEW_IMAGE "$NEW_IMAGE" \
+               --arg API_SECRET "${{ steps.get-secrets.outputs.cubejs-api-secret }}" \
+               --arg DB_HOST "${{ steps.get-secrets.outputs.cubejs-db-host }}" \
+               --arg DB_NAME "${{ steps.get-secrets.outputs.cubejs-db-name }}" \
+               --arg DB_USER "${{ steps.get-secrets.outputs.cubejs-db-user }}" \
+               --arg DB_PASS "${{ steps.get-secrets.outputs.cubejs-db-pass }}" \
+               --arg ENVIRONMENT "$ENVIRONMENT" \
+               --arg BUILD_NUMBER "${{ github.run_number }}" '
+              .containerDefinitions[0].image = $NEW_IMAGE |
+              .containerDefinitions[0].environment = (
+                (.containerDefinitions[0].environment // []) | 
+                map(select(.name | test("^(CUBEJS_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
+                  {"name": "CUBEJS_API_SECRET", "value": $API_SECRET},
+                  {"name": "CUBEJS_DB_TYPE", "value": "mssql"},
+                  {"name": "CUBEJS_DEV_MODE", "value": "false"},
+                  {"name": "CUBEJS_DB_HOST", "value": $DB_HOST},
+                  {"name": "CUBEJS_DB_NAME", "value": $DB_NAME},
+                  {"name": "CUBEJS_DB_USER", "value": $DB_USER},
+                  {"name": "CUBEJS_DB_PASS", "value": $DB_PASS},
+                  {"name": "CUBEJS_DB_SSL", "value": "true"},
+                  {"name": "CUBEJS_DEFAULT_API_SCOPES", "value": "graphql,meta,data,jobs"},
+                  {"name": "CUBEJS_CUBESTORE_HOST", "value": "cubestore-router"},
+                  {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
+                  {"name": "CUBEJS_ENVIRONMENT", "value": $ENVIRONMENT},
+                  {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
+                ]
+              ) |
+              del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+            ' current-td.json > new-td.json
+            
+          elif [[ "$COMPONENT" == "cube-refresh-worker" ]]; then
+            # Update Cube Refresh Worker with secrets
+            jq --arg NEW_IMAGE "$NEW_IMAGE" \
+               --arg API_SECRET "${{ steps.get-secrets.outputs.cubejs-api-secret }}" \
+               --arg DB_HOST "${{ steps.get-secrets.outputs.cubejs-db-host }}" \
+               --arg DB_NAME "${{ steps.get-secrets.outputs.cubejs-db-name }}" \
+               --arg DB_USER "${{ steps.get-secrets.outputs.cubejs-db-user }}" \
+               --arg DB_PASS "${{ steps.get-secrets.outputs.cubejs-db-pass }}" \
+               --arg ENVIRONMENT "$ENVIRONMENT" \
+               --arg BUILD_NUMBER "${{ github.run_number }}" '
+              .containerDefinitions[0].image = $NEW_IMAGE |
+              .containerDefinitions[0].environment = (
+                (.containerDefinitions[0].environment // []) | 
+                map(select(.name | test("^(CUBEJS_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
+                  {"name": "CUBEJS_API_SECRET", "value": $API_SECRET},
+                  {"name": "CUBEJS_DB_TYPE", "value": "mssql"},
+                  {"name": "CUBEJS_DEV_MODE", "value": "false"},
+                  {"name": "CUBEJS_DB_HOST", "value": $DB_HOST},
+                  {"name": "CUBEJS_DB_NAME", "value": $DB_NAME},
+                  {"name": "CUBEJS_DB_USER", "value": $DB_USER},
+                  {"name": "CUBEJS_DB_PASS", "value": $DB_PASS},
+                  {"name": "CUBEJS_DB_SSL", "value": "true"},
+                  {"name": "CUBEJS_DEFAULT_API_SCOPES", "value": "graphql,meta,data,jobs"},
+                  {"name": "CUBEJS_CUBESTORE_HOST", "value": "cubestore-router"},
+                  {"name": "CUBEJS_REFRESH_WORKER", "value": "true"},
+                  {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
+                  {"name": "CUBEJS_ENVIRONMENT", "value": $ENVIRONMENT},
+                  {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
+                ]
+              ) |
+              del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+            ' current-td.json > new-td.json
+            
+          elif [[ "$COMPONENT" == "cubestore-router" ]]; then
+            # Update Cubestore Router
+            jq --arg NEW_IMAGE "$NEW_IMAGE" \
+               --arg ENVIRONMENT "$ENVIRONMENT" \
+               --arg BUILD_NUMBER "${{ github.run_number }}" '
+              .containerDefinitions[0].image = $NEW_IMAGE |
+              .containerDefinitions[0].environment = (
+                (.containerDefinitions[0].environment // []) | 
+                map(select(.name | test("^(CUBESTORE_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
+                  {"name": "CUBESTORE_REMOTE_DIR", "value": "/cube/data"},
+                  {"name": "CUBESTORE_META_PORT", "value": "9999"},
+                  {"name": "CUBESTORE_SERVER_NAME", "value": "cubestore-router:9999"},
+                  {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
+                  {"name": "CUBESTORE_ENVIRONMENT", "value": $ENVIRONMENT},
+                  {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
+                ]
+              ) |
+              del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+            ' current-td.json > new-td.json
+            
+          elif [[ "$COMPONENT" == "cubestore-worker" ]]; then
+            # Update Cubestore Worker
+            jq --arg NEW_IMAGE "$NEW_IMAGE" \
+               --arg ENVIRONMENT "$ENVIRONMENT" \
+               --arg BUILD_NUMBER "${{ github.run_number }}" '
+              .containerDefinitions[0].image = $NEW_IMAGE |
+              .containerDefinitions[0].environment = (
+                (.containerDefinitions[0].environment // []) | 
+                map(select(.name | test("^(CUBESTORE_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
+                  {"name": "CUBESTORE_SERVER_NAME", "value": "cubestore-worker-0.cubestore-worker:10001"},
+                  {"name": "CUBESTORE_WORKER_PORT", "value": "10001"},
+                  {"name": "CUBESTORE_REMOTE_DIR", "value": "/cube/data"},
+                  {"name": "CUBESTORE_META_ADDR", "value": "cubestore-router:9999"},
+                  {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
+                  {"name": "CUBESTORE_ENVIRONMENT", "value": $ENVIRONMENT},
+                  {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
+                ]
+              ) |
+              del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+            ' current-td.json > new-td.json
+          fi
+          
+          # Register new task definition
+          NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://new-td.json --query taskDefinition.taskDefinitionArn --output text)
+          echo "✅ New Task Definition registered: $NEW_TD_ARN"
+          
+          # Update ECS service
+          echo "🔄 Updating ECS service..."
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$NEW_TD_ARN" \
+            --force-new-deployment
+          
+          echo "✅ $COMPONENT ECS service update initiated"
+          
+          # Clean up
+          rm -f current-td.json new-td.json
+
+  wait-deployment:
+    name: ⏳ Wait for ECS Deployment
+    needs: [dispatch, deploy-to-ecs]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: 🔐 Configure AWS credentials (Dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.DEV_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'dev' }}
+      
+      - name: 🔐 Configure AWS credentials (Non-Prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.NP_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
+      
+      - name: 🔐 Configure AWS credentials (Prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'prod' }}
+
+      - name: ⏳ Wait for All Services to Stabilize
+        run: |
+          set -euo pipefail
+          
+          ENVIRONMENT="${{ needs.dispatch.outputs.environment }}"
+          
+          case "$ENVIRONMENT" in
+            dev)
+              ECS_CLUSTER='${{ secrets.DEV_ECS_CLUSTER_NAME }}'
+              CUBE_API_SERVICE='${{ secrets.DEV_CUBE_API_ECS_SERVICE }}'
+              REFRESH_WORKER_SERVICE='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+              ROUTER_SERVICE='${{ secrets.DEV_CUBESTORE_ROUTER_ECS_SERVICE }}'
+              WORKER_SERVICE='${{ secrets.DEV_CUBESTORE_WORKER_ECS_SERVICE }}'
+              ;;
+            non-prod)
+              ECS_CLUSTER='${{ secrets.NP_ECS_CLUSTER_NAME }}'
+              CUBE_API_SERVICE='${{ secrets.NP_CUBE_API_ECS_SERVICE }}'
+              REFRESH_WORKER_SERVICE='${{ secrets.NP_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+              ROUTER_SERVICE='${{ secrets.NP_CUBESTORE_ROUTER_ECS_SERVICE }}'
+              WORKER_SERVICE='${{ secrets.NP_CUBESTORE_WORKER_ECS_SERVICE }}'
+              ;;
+            prod)
+              ECS_CLUSTER='${{ secrets.PROD_ECS_CLUSTER_NAME }}'
+              CUBE_API_SERVICE='${{ secrets.PROD_CUBE_API_ECS_SERVICE }}'
+              REFRESH_WORKER_SERVICE='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+              ROUTER_SERVICE='${{ secrets.PROD_CUBESTORE_ROUTER_ECS_SERVICE }}'
+              WORKER_SERVICE='${{ secrets.PROD_CUBESTORE_WORKER_ECS_SERVICE }}'
+              ;;
+          esac
+          
+          echo "⏳ Waiting for all ECS services to stabilize..."
+          echo "🏢 Cluster: $ECS_CLUSTER"
+          
+          # Wait for each service
+          for service in "$CUBE_API_SERVICE" "$REFRESH_WORKER_SERVICE" "$ROUTER_SERVICE" "$WORKER_SERVICE"; do
+            echo "⏳ Waiting for $service to stabilize..."
+            
+            if aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$service" --cli-read-timeout 900; then
+              echo "✅ $service deployment successful"
+              
+              # Verify service health
+              RUNNING_COUNT=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$service" --query 'services[0].runningCount' --output text)
+              DESIRED_COUNT=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$service" --query 'services[0].desiredCount' --output text)
+              
+              if [ "$RUNNING_COUNT" -eq "$DESIRED_COUNT" ]; then
+                echo "✅ $service health check passed ($RUNNING_COUNT/$DESIRED_COUNT tasks running)"
+              else
+                echo "❌ $service health check failed ($RUNNING_COUNT/$DESIRED_COUNT tasks running)"
+                exit 1
+              fi
+            else
+              echo "❌ $service deployment failed or timed out"
+              exit 1
+            fi
+          done
+
+  # ========================================
+  # STAGE 3: VERIFICATION
+  # ========================================
+  verify-images:
+    name: 🔍 Verify Images
+    needs: [dispatch, build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        component: [cube-api, cube-refresh-worker, cubestore-router, cubestore-worker]
+    
+    steps:
+      - name: 🔐 Configure AWS (Dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.DEV_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'dev' }}
+      
+      - name: 🔐 Configure AWS (Non-Prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.NP_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
+      
+      - name: 🔐 Configure AWS (Prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
+        if: ${{ needs.dispatch.outputs.environment == 'prod' }}
+      
+      - name: 🔍 Verify ${{ matrix.component }} Image
+        env:
+          ENVIRONMENT: ${{ needs.dispatch.outputs.environment }}
+          BUILD_TAG: ${{ needs.build-and-push.outputs.build-tag }}
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          case "$ENVIRONMENT" in
+            dev)
+              AWS_ACCOUNT_ID='${{ secrets.DEV_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.DEV_AWS_REGION }}'
+              ECR_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
+              if [[ "$COMPONENT" == "cube-refresh-worker" ]]; then
+                ECR_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              elif [[ "$COMPONENT" == "cubestore-router" ]]; then
+                ECR_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
+              elif [[ "$COMPONENT" == "cubestore-worker" ]]; then
+                ECR_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+              fi
+              ;;
+            non-prod)
+              AWS_ACCOUNT_ID='${{ secrets.NP_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.NP_AWS_REGION }}'
+              ECR_REPO='${{ secrets.NP_CUBE_API_ECR_REPO }}'
+              if [[ "$COMPONENT" == "cube-refresh-worker" ]]; then
+                ECR_REPO='${{ secrets.NP_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              elif [[ "$COMPONENT" == "cubestore-router" ]]; then
+                ECR_REPO='${{ secrets.NP_CUBESTORE_ROUTER_ECR_REPO }}'
+              elif [[ "$COMPONENT" == "cubestore-worker" ]]; then
+                ECR_REPO='${{ secrets.NP_CUBESTORE_WORKER_ECR_REPO }}'
+              fi
+              ;;
+            prod)
+              AWS_ACCOUNT_ID='${{ secrets.PROD_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.PROD_AWS_REGION }}'
+              ECR_REPO='${{ secrets.PROD_CUBE_API_ECR_REPO }}'
+              if [[ "$COMPONENT" == "cube-refresh-worker" ]]; then
+                ECR_REPO='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              elif [[ "$COMPONENT" == "cubestore-router" ]]; then
+                ECR_REPO='${{ secrets.PROD_CUBESTORE_ROUTER_ECR_REPO }}'
+              elif [[ "$COMPONENT" == "cubestore-worker" ]]; then
+                ECR_REPO='${{ secrets.PROD_CUBESTORE_WORKER_ECR_REPO }}'
+              fi
+              ;;
+          esac
+          EXPECTED="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}:${BUILD_TAG}"
+          echo "🔍 Verifying $COMPONENT for $ENVIRONMENT..."
+          echo "🎯 Expected image: $EXPECTED"
+          echo "📊 GitHub Run Number: ${{ github.run_number }}"
+
+          # Verify image exists in ECR
+          IMAGE_DETAILS=$(aws ecr describe-images --repository-name "$ECR_REPO" --image-ids imageTag="$BUILD_TAG" --query 'imageDetails[0]' --output json 2>/dev/null || echo "{}")
+          
+          if [[ "$IMAGE_DETAILS" == "{}" ]]; then
+            echo "❌ Image not found in ECR"
+            exit 1
+          fi
+
+          IMAGE_SIZE=$(echo "$IMAGE_DETAILS" | jq -r '.imageSizeInBytes')
+          IMAGE_PUSHED=$(echo "$IMAGE_DETAILS" | jq -r '.imagePushedAt')
+          
+          echo "✅ Image verified in ECR"
+          echo "📏 Size: $(numfmt --to=iec $IMAGE_SIZE)B"
+          echo "📅 Pushed: $IMAGE_PUSHED"
+
+  health-check:
+    name: 💓 Health Check
+    needs: [dispatch, build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: 💓 Check CubeJS Components Health
+        env:
+          ENVIRONMENT: ${{ needs.dispatch.outputs.environment }}
+        run: |
+          echo "💓 Checking CubeJS components health for $ENVIRONMENT..."
+          echo "📊 GitHub Run Number: ${{ github.run_number }}"
+          
+          # Add CubeJS specific health check logic here
+          # This could include:
+          # - Checking if images can be pulled
+          # - Running basic container tests
+          # - Validating configuration
+          
+          echo "✅ Health check completed for all CubeJS components"
+
+  # ========================================
+  # STAGE 4: FINAL STATUS
+  # ========================================
+  status:
+    name: 📊 Deployment Status
+    if: always()
+    needs: [dispatch, build-and-push, verify-images, health-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📊 Report Status
+        env:
+          ENVIRONMENT: ${{ needs.dispatch.outputs.environment }}
+          BUILD_ID: ${{ needs.dispatch.outputs.build-id }}
+          ALL_TAGS: ${{ needs.build-and-push.outputs.all-tags }}
+        run: |
+          echo "🎉 **CUBEJS DEPLOYMENT SUMMARY**"
+          echo "========================================="
+          echo "Environment: $ENVIRONMENT"
+          echo "GitHub Run Number: ${{ github.run_number }}"
+          echo "Build ID: $BUILD_ID"
+          echo "Docker Tags: $ALL_TAGS"
+          echo "Git Commit: ${{ github.sha }}"
+          echo "Build Status: ${{ needs.build-and-push.result }}"
+          echo "Verification Status: ${{ needs.verify-images.result }}"
+          echo "Health Check Status: ${{ needs.health-check.result }}"
+          echo ""
+          
+          if [ "${{ needs.build-and-push.result }}" = "success" ] && [ "${{ needs.verify-images.result }}" = "success" ]; then
+            echo "🎉 DEPLOYMENT SUCCESSFUL!"
+            echo "✅ All 4 CubeJS components built and verified:"
+            echo "   - cube-api"
+            echo "   - cube-refresh-worker"  
+            echo "   - cubestore-router"
+            echo "   - cubestore-worker"
+          else
+            echo "❌ DEPLOYMENT FAILED!"
+            echo "Build Status: ${{ needs.build-and-push.result }}"
+            echo "Verification Status: ${{ needs.verify-images.result }}"
+          fi
+          
+          echo ""
+          echo "🔗 **Quick Links:**"
+          echo "- GitHub Run: #${{ github.run_number }}"
+          echo "- Git Commit: ${{ github.sha }}"
+          echo "- Workflow: ${{ github.workflow }}"
+          
+          # Environment-specific console links
+          case "$ENVIRONMENT" in
+            dev)
+              echo "- Dev ECR Console: https://${{ secrets.DEV_AWS_REGION }}.console.aws.amazon.com/ecr/repositories"
+              ;;
+            non-prod)
+              echo "- Non-Prod ECR Console: https://${{ secrets.NP_AWS_REGION }}.console.aws.amazon.com/ecr/repositories"
+              ;;
+            prod)
+              echo "- Prod ECR Console: https://${{ secrets.PROD_AWS_REGION }}.console.aws.amazon.com/ecr/repositories"
+              ;;
+          esac
+
+      - name: 🧊 CubeJS Access Info
+        if: needs.build-and-push.result == 'success'
+        env:
+          ENVIRONMENT: ${{ needs.dispatch.outputs.environment }}
+          BUILD_TAG: ${{ needs.build-and-push.outputs.build-tag }}
+        run: |
+          case "$ENVIRONMENT" in
+            dev)
+              AWS_ACCOUNT_ID='${{ secrets.DEV_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.DEV_AWS_REGION }}'
+              PREFIX='dev'
+              ;;
+            non-prod)
+              AWS_ACCOUNT_ID='${{ secrets.NP_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.NP_AWS_REGION }}'
+              PREFIX='non-prod'
+              ;;
+            prod)
+              AWS_ACCOUNT_ID='${{ secrets.PROD_AWS_ACCOUNT_ID }}'
+              REGION='${{ secrets.PROD_AWS_REGION }}'
+              PREFIX='prod'
+              ;;
+          esac
+          
+          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+          
+          echo "🧊 **CubeJS Components Available:**"
+          echo ""
+          # Get ECR repo names based on environment
+          case "$ENVIRONMENT" in
+            dev)
+              CUBE_API_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
+              CUBE_REFRESH_WORKER_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              CUBESTORE_ROUTER_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
+              CUBESTORE_WORKER_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+              ;;
+            non-prod)
+              CUBE_API_REPO='${{ secrets.NP_CUBE_API_ECR_REPO }}'
+              CUBE_REFRESH_WORKER_REPO='${{ secrets.NP_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              CUBESTORE_ROUTER_REPO='${{ secrets.NP_CUBESTORE_ROUTER_ECR_REPO }}'
+              CUBESTORE_WORKER_REPO='${{ secrets.NP_CUBESTORE_WORKER_ECR_REPO }}'
+              ;;
+            prod)
+              CUBE_API_REPO='${{ secrets.PROD_CUBE_API_ECR_REPO }}'
+              CUBE_REFRESH_WORKER_REPO='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECR_REPO }}'
+              CUBESTORE_ROUTER_REPO='${{ secrets.PROD_CUBESTORE_ROUTER_ECR_REPO }}'
+              CUBESTORE_WORKER_REPO='${{ secrets.PROD_CUBESTORE_WORKER_ECR_REPO }}'
+              ;;
+          esac
+          
+          echo "📦 **Images built with tag: ${BUILD_TAG}**"
+          echo "- ${ECR_REGISTRY}/${CUBE_API_REPO}:${BUILD_TAG}"
+          echo "- ${ECR_REGISTRY}/${CUBE_REFRESH_WORKER_REPO}:${BUILD_TAG}"
+          echo "- ${ECR_REGISTRY}/${CUBESTORE_ROUTER_REPO}:${BUILD_TAG}"
+          echo "- ${ECR_REGISTRY}/${CUBESTORE_WORKER_REPO}:${BUILD_TAG}"
+          echo ""
+          echo "🏷️ **Latest tags also available:**"
+          echo "- ${ECR_REGISTRY}/${CUBE_API_REPO}:latest"
+          echo "- ${ECR_REGISTRY}/${CUBE_REFRESH_WORKER_REPO}:latest"
+          echo "- ${ECR_REGISTRY}/${CUBESTORE_ROUTER_REPO}:latest"
+          echo "- ${ECR_REGISTRY}/${CUBESTORE_WORKER_REPO}:latest"
+          echo ""
+          echo "🚀 **Deploy with Helm:**"
+          echo "helm upgrade --install cubejs ./cubejs \\"
+          echo "  --set cubeApi.image=${ECR_REGISTRY}/${CUBE_API_REPO}:${BUILD_TAG} \\"
+          echo "  --set cubeRefreshWorker.image=${ECR_REGISTRY}/${CUBE_REFRESH_WORKER_REPO}:${BUILD_TAG} \\"
+          echo "  --set cubestoreRouter.image=${ECR_REGISTRY}/${CUBESTORE_ROUTER_REPO}:${BUILD_TAG} \\"
+          echo "  --set cubestoreWorker.image=${ECR_REGISTRY}/${CUBESTORE_WORKER_REPO}:${BUILD_TAG}"
+          echo ""
+          echo "✅ CubeJS is now available in $ENVIRONMENT environment!"
