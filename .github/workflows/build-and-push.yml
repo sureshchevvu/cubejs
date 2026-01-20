@@ -168,10 +168,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-build-dev
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -182,10 +182,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-build-non-prod
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.NP_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.NP_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -196,10 +196,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-build-prod
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
       
       - name: 🔑 ECR Login
@@ -371,10 +371,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-deploy-dev
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -385,10 +385,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-deploy-non-prod
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.NP_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.NP_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -399,10 +399,11 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-deploy-prod
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
+        if: ${{ needs.dispatch.outputs.environment == 'prod' }}
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
 
       - name: 🔑 Retrieve Secrets from AWS Secrets Manager
@@ -687,10 +688,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-wait-dev
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -701,10 +702,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-wait-non-prod
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.NP_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.NP_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -715,10 +716,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-wait-prod
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
 
       - name: ⏳ Wait for All Services to Stabilize
@@ -800,10 +801,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-verify-dev
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS (Non-Prod)
@@ -814,10 +815,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-verify-non-prod
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.NP_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.NP_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS (Prod)
@@ -828,10 +829,10 @@ jobs:
           audience: sts.amazonaws.com
           role-session-name: github-actions-cubejs-verify-prod
           mask-aws-account-id: false
+          output-env-credentials: true
         env:
           AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
-          AWS_ACTIONS_ALLOW_USE_OPEN_ID_CONNECT: true
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
       
       - name: 🔍 Verify ${{ matrix.component }} Image
