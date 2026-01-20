@@ -1,0 +1,50 @@
+name: Test OIDC Authentication
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - edbwe_dev
+    paths:
+      - '.github/workflows/test-oidc.yml'
+
+jobs:
+  test-oidc:
+    name: 🧪 Test OIDC Authentication
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: 🐛 Debug Context Information
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Run ID: ${{ github.run_id }}"
+      
+      - name: 🔐 Test AWS OIDC Authentication
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          aws-region: us-east-1
+          audience: sts.amazonaws.com
+          output-env-credentials: true
+      
+      - name: 🔍 Verify AWS Authentication
+        run: |
+          echo "Testing AWS CLI access..."
+          aws sts get-caller-identity
+          echo "✅ AWS Authentication successful!"
+      
+      - name: 🏷️ Test ECR Access
+        run: |
+          echo "Testing ECR access..."
+          aws ecr describe-repositories --region us-east-1 --max-items 5 || echo "ECR access may be limited"
+          echo "✅ ECR test completed!"
