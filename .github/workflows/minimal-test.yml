@@ -17,6 +17,7 @@ jobs:
           role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
           aws-region: us-east-1
           audience: sts.amazonaws.com
+          output-env-credentials: true
       
       - name: Verify Success
         run: |
