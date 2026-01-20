@@ -160,7 +160,19 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
       
-      - name: 🔐 Configure AWS credentials (Dev)
+      - name: � Debug Repository and OIDC Information
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Environment: ${{ needs.dispatch.outputs.environment }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Job: ${{ github.job }}"
+          echo "Workflow: ${{ github.workflow }}"
+      
+      - name: �🔐 Configure AWS credentials (Dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
