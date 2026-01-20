@@ -201,8 +201,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -210,8 +208,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -219,8 +215,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
       
       - name: 🔑 ECR Login
@@ -389,8 +383,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -398,8 +390,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -407,8 +397,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
 
       - name: 🔑 Retrieve Secrets from AWS Secrets Manager
@@ -690,8 +678,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -699,8 +685,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -708,8 +692,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
 
       - name: ⏳ Wait for All Services to Stabilize
@@ -788,8 +770,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS (Non-Prod)
@@ -797,8 +777,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS (Prod)
@@ -806,8 +784,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
       
       - name: 🔍 Verify ${{ matrix.component }} Image
