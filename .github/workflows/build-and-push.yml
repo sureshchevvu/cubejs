@@ -201,6 +201,13 @@ jobs:
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
+          audience: sts.amazonaws.com
+          role-session-name: github-actions-cubejs-build-dev
+          mask-aws-account-id: false
+          output-env-credentials: true
+        env:
+          AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
+          AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -770,6 +777,8 @@ jobs:
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
+          audience: sts.amazonaws.com
+          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS (Non-Prod)
@@ -777,6 +786,8 @@ jobs:
         with:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
+          audience: sts.amazonaws.com
+          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS (Prod)
@@ -784,6 +795,8 @@ jobs:
         with:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
+          audience: sts.amazonaws.com
+          output-env-credentials: true
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
       
       - name: 🔍 Verify ${{ matrix.component }} Image
