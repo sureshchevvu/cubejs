@@ -1,662 +1,662 @@
-name: Deploy CubeJS to Environment
+# name: Deploy CubeJS to Environment
 
-#Created_BY = EDBWE 12-01-2026 
+# #Created_BY = EDBWE 12-01-2026 
 
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - non-prod
-          - prod
-      image_tag:
-        description: 'Image tag to deploy (optional, defaults to latest)'
-        required: false
-        default: 'latest'
-        type: string
-  workflow_call:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        type: string
-      image_tag:
-        description: 'Image tag to deploy'
-        required: false
-        default: 'latest'
-        type: string
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: 'Environment to deploy'
+#         required: true
+#         default: 'dev'
+#         type: choice
+#         options:
+#           - dev
+#           - non-prod
+#           - prod
+#       image_tag:
+#         description: 'Image tag to deploy (optional, defaults to latest)'
+#         required: false
+#         default: 'latest'
+#         type: string
+#   workflow_call:
+#     inputs:
+#       environment:
+#         description: 'Environment to deploy'
+#         required: true
+#         type: string
+#       image_tag:
+#         description: 'Image tag to deploy'
+#         required: false
+#         default: 'latest'
+#         type: string
 
-env:
-  ENVIRONMENT: ${{ inputs.environment }}
-  IMAGE_TAG: ${{ inputs.image_tag }}
+# env:
+#   ENVIRONMENT: ${{ inputs.environment }}
+#   IMAGE_TAG: ${{ inputs.image_tag }}
 
-jobs:
-  # ========================================
-  # STAGE 1: ENVIRONMENT SETUP
-  # ========================================
-  setup:
-    name: 🔧 Setup Environment
-    runs-on: ubuntu-latest
-    outputs:
-      environment: ${{ inputs.environment }}
-      aws-region: ${{ steps.env-config.outputs.aws-region }}
-      aws-account-id: ${{ steps.env-config.outputs.aws-account-id }}
-      secrets-name: ${{ steps.env-config.outputs.secrets-name }}
+# jobs:
+#   # ========================================
+#   # STAGE 1: ENVIRONMENT SETUP
+#   # ========================================
+#   setup:
+#     name: 🔧 Setup Environment
+#     runs-on: ubuntu-latest
+#     outputs:
+#       environment: ${{ inputs.environment }}
+#       aws-region: ${{ steps.env-config.outputs.aws-region }}
+#       aws-account-id: ${{ steps.env-config.outputs.aws-account-id }}
+#       secrets-name: ${{ steps.env-config.outputs.secrets-name }}
     
-    steps:
-      - name: 🔧 Configure Environment Variables
-        id: env-config
-        run: |
-          case "${{ inputs.environment }}" in
-            dev)
-              echo "aws-region=${{ secrets.DEV_AWS_REGION }}" >> $GITHUB_OUTPUT
-              echo "aws-account-id=${{ secrets.DEV_AWS_ACCOUNT_ID }}" >> $GITHUB_OUTPUT
-              echo "secrets-name=${{ secrets.DEV_SECRETS_NAME }}" >> $GITHUB_OUTPUT
-              echo "🔵 Environment: Dev"
-              ;;
-            non-prod)
-              echo "aws-region=${{ secrets.NP_AWS_REGION }}" >> $GITHUB_OUTPUT
-              echo "aws-account-id=${{ secrets.NP_AWS_ACCOUNT_ID }}" >> $GITHUB_OUTPUT
-              echo "secrets-name=${{ secrets.NP_SECRETS_NAME }}" >> $GITHUB_OUTPUT
-              echo "🟡 Environment: Non-Prod"
-              ;;
-            prod)
-              echo "aws-region=${{ secrets.PROD_AWS_REGION }}" >> $GITHUB_OUTPUT
-              echo "aws-account-id=${{ secrets.PROD_AWS_ACCOUNT_ID }}" >> $GITHUB_OUTPUT
-              echo "secrets-name=${{ secrets.PROD_SECRETS_NAME }}" >> $GITHUB_OUTPUT
-              echo "🔴 Environment: Production"
-              ;;
-            *)
-              echo "❌ Unknown environment: ${{ inputs.environment }}"
-              exit 1
-              ;;
-          esac
+#     steps:
+#       - name: 🔧 Configure Environment Variables
+#         id: env-config
+#         run: |
+#           case "${{ inputs.environment }}" in
+#             dev)
+#               echo "aws-region=${{ secrets.DEV_AWS_REGION }}" >> $GITHUB_OUTPUT
+#               echo "aws-account-id=${{ secrets.DEV_AWS_ACCOUNT_ID }}" >> $GITHUB_OUTPUT
+#               echo "secrets-name=${{ secrets.DEV_SECRETS_NAME }}" >> $GITHUB_OUTPUT
+#               echo "🔵 Environment: Dev"
+#               ;;
+#             non-prod)
+#               echo "aws-region=${{ secrets.NP_AWS_REGION }}" >> $GITHUB_OUTPUT
+#               echo "aws-account-id=${{ secrets.NP_AWS_ACCOUNT_ID }}" >> $GITHUB_OUTPUT
+#               echo "secrets-name=${{ secrets.NP_SECRETS_NAME }}" >> $GITHUB_OUTPUT
+#               echo "🟡 Environment: Non-Prod"
+#               ;;
+#             prod)
+#               echo "aws-region=${{ secrets.PROD_AWS_REGION }}" >> $GITHUB_OUTPUT
+#               echo "aws-account-id=${{ secrets.PROD_AWS_ACCOUNT_ID }}" >> $GITHUB_OUTPUT
+#               echo "secrets-name=${{ secrets.PROD_SECRETS_NAME }}" >> $GITHUB_OUTPUT
+#               echo "🔴 Environment: Production"
+#               ;;
+#             *)
+#               echo "❌ Unknown environment: ${{ inputs.environment }}"
+#               exit 1
+#               ;;
+#           esac
 
-  # ========================================
-  # STAGE 2: RETRIEVE SECRETS & DEPLOY
-  # ========================================
-  deploy:
-    name: 🚀 Deploy CubeJS
-    needs: setup
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    permissions:
-      id-token: write
-      contents: read
+#   # ========================================
+#   # STAGE 2: RETRIEVE SECRETS & DEPLOY
+#   # ========================================
+#   deploy:
+#     name: 🚀 Deploy CubeJS
+#     needs: setup
+#     runs-on: ubuntu-latest
+#     environment: ${{ inputs.environment }}
+#     permissions:
+#       id-token: write
+#       contents: read
     
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
+#     steps:
+#       - name: 📥 Checkout Code
+#         uses: actions/checkout@v4
 
-      - name: 🔐 Configure AWS credentials (Dev)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ needs.setup.outputs.aws-region }}
-        if: ${{ inputs.environment == 'dev' }}
+#       - name: 🔐 Configure AWS credentials (Dev)
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
+#           aws-region: ${{ needs.setup.outputs.aws-region }}
+#         if: ${{ inputs.environment == 'dev' }}
       
-      - name: 🔐 Configure AWS credentials (Non-Prod)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ needs.setup.outputs.aws-region }}
-        if: ${{ inputs.environment == 'non-prod' }}
+#       - name: 🔐 Configure AWS credentials (Non-Prod)
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
+#           aws-region: ${{ needs.setup.outputs.aws-region }}
+#         if: ${{ inputs.environment == 'non-prod' }}
       
-      - name: 🔐 Configure AWS credentials (Prod)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ needs.setup.outputs.aws-region }}
-        if: ${{ inputs.environment == 'prod' }}
+#       - name: 🔐 Configure AWS credentials (Prod)
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
+#           aws-region: ${{ needs.setup.outputs.aws-region }}
+#         if: ${{ inputs.environment == 'prod' }}
 
-      - name: 🔑 Retrieve Secrets from AWS Secrets Manager
-        id: get-secrets
-        run: |
-          set -euo pipefail
+#       - name: 🔑 Retrieve Secrets from AWS Secrets Manager
+#         id: get-secrets
+#         run: |
+#           set -euo pipefail
           
-          SECRETS_NAME="${{ needs.setup.outputs.secrets-name }}"
-          AWS_REGION="${{ needs.setup.outputs.aws-region }}"
+#           SECRETS_NAME="${{ needs.setup.outputs.secrets-name }}"
+#           AWS_REGION="${{ needs.setup.outputs.aws-region }}"
           
-          echo "🔍 Retrieving secrets from: $SECRETS_NAME"
+#           echo "🔍 Retrieving secrets from: $SECRETS_NAME"
           
-          # Get all secrets as JSON
-          SECRETS_JSON=$(aws secretsmanager get-secret-value \
-            --secret-id "$SECRETS_NAME" \
-            --region "$AWS_REGION" \
-            --query SecretString \
-            --output text)
+#           # Get all secrets as JSON
+#           SECRETS_JSON=$(aws secretsmanager get-secret-value \
+#             --secret-id "$SECRETS_NAME" \
+#             --region "$AWS_REGION" \
+#             --query SecretString \
+#             --output text)
           
-          # Parse and set individual secrets
-          CUBEJS_API_SECRET=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_API_SECRET // empty')
-          CUBEJS_DB_HOST=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_HOST // empty')
-          CUBEJS_DB_NAME=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_NAME // empty')
-          CUBEJS_DB_USER=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_USER // empty')
-          CUBEJS_DB_PASS=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_PASS // empty')
-          CUBEJS_JWT_SECRET=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_JWT_SECRET // empty')
+#           # Parse and set individual secrets
+#           CUBEJS_API_SECRET=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_API_SECRET // empty')
+#           CUBEJS_DB_HOST=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_HOST // empty')
+#           CUBEJS_DB_NAME=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_NAME // empty')
+#           CUBEJS_DB_USER=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_USER // empty')
+#           CUBEJS_DB_PASS=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_DB_PASS // empty')
+#           CUBEJS_JWT_SECRET=$(echo "$SECRETS_JSON" | jq -r '.CUBEJS_JWT_SECRET // empty')
           
-          # Validate required secrets
-          for secret in CUBEJS_API_SECRET CUBEJS_DB_HOST CUBEJS_DB_NAME CUBEJS_DB_USER CUBEJS_DB_PASS; do
-            var_name="$secret"
-            if [ -z "${!var_name}" ] || [ "${!var_name}" = "null" ]; then
-              echo "❌ Required secret $secret is missing or empty"
-              exit 1
-            fi
-          done
+#           # Validate required secrets
+#           for secret in CUBEJS_API_SECRET CUBEJS_DB_HOST CUBEJS_DB_NAME CUBEJS_DB_USER CUBEJS_DB_PASS; do
+#             var_name="$secret"
+#             if [ -z "${!var_name}" ] || [ "${!var_name}" = "null" ]; then
+#               echo "❌ Required secret $secret is missing or empty"
+#               exit 1
+#             fi
+#           done
           
-          # Set outputs (masked)
-          echo "cubejs-api-secret=$CUBEJS_API_SECRET" >> $GITHUB_OUTPUT
-          echo "cubejs-db-host=$CUBEJS_DB_HOST" >> $GITHUB_OUTPUT  
-          echo "cubejs-db-name=$CUBEJS_DB_NAME" >> $GITHUB_OUTPUT
-          echo "cubejs-db-user=$CUBEJS_DB_USER" >> $GITHUB_OUTPUT
-          echo "cubejs-db-pass=$CUBEJS_DB_PASS" >> $GITHUB_OUTPUT
-          echo "cubejs-jwt-secret=$CUBEJS_JWT_SECRET" >> $GITHUB_OUTPUT
+#           # Set outputs (masked)
+#           echo "cubejs-api-secret=$CUBEJS_API_SECRET" >> $GITHUB_OUTPUT
+#           echo "cubejs-db-host=$CUBEJS_DB_HOST" >> $GITHUB_OUTPUT  
+#           echo "cubejs-db-name=$CUBEJS_DB_NAME" >> $GITHUB_OUTPUT
+#           echo "cubejs-db-user=$CUBEJS_DB_USER" >> $GITHUB_OUTPUT
+#           echo "cubejs-db-pass=$CUBEJS_DB_PASS" >> $GITHUB_OUTPUT
+#           echo "cubejs-jwt-secret=$CUBEJS_JWT_SECRET" >> $GITHUB_OUTPUT
           
-          echo "✅ Successfully retrieved secrets from AWS Secrets Manager"
-          echo "🔒 Retrieved secrets: CUBEJS_API_SECRET, CUBEJS_DB_HOST, CUBEJS_DB_NAME, CUBEJS_DB_USER, CUBEJS_DB_PASS"
+#           echo "✅ Successfully retrieved secrets from AWS Secrets Manager"
+#           echo "🔒 Retrieved secrets: CUBEJS_API_SECRET, CUBEJS_DB_HOST, CUBEJS_DB_NAME, CUBEJS_DB_USER, CUBEJS_DB_PASS"
 
-      - name: 🏷️ Get Image Tags and ECS Config
-        id: image-tags
-        run: |
-          case "${{ inputs.environment }}" in
-            dev)
-              CUBE_API_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
-              CUBE_REFRESH_WORKER_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
-              CUBESTORE_ROUTER_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
-              CUBESTORE_WORKER_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
-              ECS_CLUSTER='${{ secrets.DEV_ECS_CLUSTER_NAME }}'
-              CUBE_API_SERVICE='${{ secrets.DEV_CUBE_API_ECS_SERVICE }}'
-              CUBE_REFRESH_WORKER_SERVICE='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
-              CUBESTORE_ROUTER_SERVICE='${{ secrets.DEV_CUBESTORE_ROUTER_ECS_SERVICE }}'
-              CUBESTORE_WORKER_SERVICE='${{ secrets.DEV_CUBESTORE_WORKER_ECS_SERVICE }}'
-              ;;
-            non-prod)
-              CUBE_API_REPO='${{ secrets.NP_CUBE_API_ECR_REPO }}'
-              CUBE_REFRESH_WORKER_REPO='${{ secrets.NP_CUBE_REFRESH_WORKER_ECR_REPO }}'
-              CUBESTORE_ROUTER_REPO='${{ secrets.NP_CUBESTORE_ROUTER_ECR_REPO }}'
-              CUBESTORE_WORKER_REPO='${{ secrets.NP_CUBESTORE_WORKER_ECR_REPO }}'
-              ECS_CLUSTER='${{ secrets.NP_ECS_CLUSTER_NAME }}'
-              CUBE_API_SERVICE='${{ secrets.NP_CUBE_API_ECS_SERVICE }}'
-              CUBE_REFRESH_WORKER_SERVICE='${{ secrets.NP_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
-              CUBESTORE_ROUTER_SERVICE='${{ secrets.NP_CUBESTORE_ROUTER_ECS_SERVICE }}'
-              CUBESTORE_WORKER_SERVICE='${{ secrets.NP_CUBESTORE_WORKER_ECS_SERVICE }}'
-              ;;
-            prod)
-              CUBE_API_REPO='${{ secrets.PROD_CUBE_API_ECR_REPO }}'
-              CUBE_REFRESH_WORKER_REPO='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECR_REPO }}'
-              CUBESTORE_ROUTER_REPO='${{ secrets.PROD_CUBESTORE_ROUTER_ECR_REPO }}'
-              CUBESTORE_WORKER_REPO='${{ secrets.PROD_CUBESTORE_WORKER_ECR_REPO }}'
-              ECS_CLUSTER='${{ secrets.PROD_ECS_CLUSTER_NAME }}'
-              CUBE_API_SERVICE='${{ secrets.PROD_CUBE_API_ECS_SERVICE }}'
-              CUBE_REFRESH_WORKER_SERVICE='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
-              CUBESTORE_ROUTER_SERVICE='${{ secrets.PROD_CUBESTORE_ROUTER_ECS_SERVICE }}'
-              CUBESTORE_WORKER_SERVICE='${{ secrets.PROD_CUBESTORE_WORKER_ECS_SERVICE }}'
-              ;;
-          esac
+#       - name: 🏷️ Get Image Tags and ECS Config
+#         id: image-tags
+#         run: |
+#           case "${{ inputs.environment }}" in
+#             dev)
+#               CUBE_API_REPO='${{ secrets.DEV_CUBE_API_ECR_REPO }}'
+#               CUBE_REFRESH_WORKER_REPO='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECR_REPO }}'
+#               CUBESTORE_ROUTER_REPO='${{ secrets.DEV_CUBESTORE_ROUTER_ECR_REPO }}'
+#               CUBESTORE_WORKER_REPO='${{ secrets.DEV_CUBESTORE_WORKER_ECR_REPO }}'
+#               ECS_CLUSTER='${{ secrets.DEV_ECS_CLUSTER_NAME }}'
+#               CUBE_API_SERVICE='${{ secrets.DEV_CUBE_API_ECS_SERVICE }}'
+#               CUBE_REFRESH_WORKER_SERVICE='${{ secrets.DEV_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+#               CUBESTORE_ROUTER_SERVICE='${{ secrets.DEV_CUBESTORE_ROUTER_ECS_SERVICE }}'
+#               CUBESTORE_WORKER_SERVICE='${{ secrets.DEV_CUBESTORE_WORKER_ECS_SERVICE }}'
+#               ;;
+#             non-prod)
+#               CUBE_API_REPO='${{ secrets.NP_CUBE_API_ECR_REPO }}'
+#               CUBE_REFRESH_WORKER_REPO='${{ secrets.NP_CUBE_REFRESH_WORKER_ECR_REPO }}'
+#               CUBESTORE_ROUTER_REPO='${{ secrets.NP_CUBESTORE_ROUTER_ECR_REPO }}'
+#               CUBESTORE_WORKER_REPO='${{ secrets.NP_CUBESTORE_WORKER_ECR_REPO }}'
+#               ECS_CLUSTER='${{ secrets.NP_ECS_CLUSTER_NAME }}'
+#               CUBE_API_SERVICE='${{ secrets.NP_CUBE_API_ECS_SERVICE }}'
+#               CUBE_REFRESH_WORKER_SERVICE='${{ secrets.NP_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+#               CUBESTORE_ROUTER_SERVICE='${{ secrets.NP_CUBESTORE_ROUTER_ECS_SERVICE }}'
+#               CUBESTORE_WORKER_SERVICE='${{ secrets.NP_CUBESTORE_WORKER_ECS_SERVICE }}'
+#               ;;
+#             prod)
+#               CUBE_API_REPO='${{ secrets.PROD_CUBE_API_ECR_REPO }}'
+#               CUBE_REFRESH_WORKER_REPO='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECR_REPO }}'
+#               CUBESTORE_ROUTER_REPO='${{ secrets.PROD_CUBESTORE_ROUTER_ECR_REPO }}'
+#               CUBESTORE_WORKER_REPO='${{ secrets.PROD_CUBESTORE_WORKER_ECR_REPO }}'
+#               ECS_CLUSTER='${{ secrets.PROD_ECS_CLUSTER_NAME }}'
+#               CUBE_API_SERVICE='${{ secrets.PROD_CUBE_API_ECS_SERVICE }}'
+#               CUBE_REFRESH_WORKER_SERVICE='${{ secrets.PROD_CUBE_REFRESH_WORKER_ECS_SERVICE }}'
+#               CUBESTORE_ROUTER_SERVICE='${{ secrets.PROD_CUBESTORE_ROUTER_ECS_SERVICE }}'
+#               CUBESTORE_WORKER_SERVICE='${{ secrets.PROD_CUBESTORE_WORKER_ECS_SERVICE }}'
+#               ;;
+#           esac
           
-          ECR_REGISTRY="${{ needs.setup.outputs.aws-account-id }}.dkr.ecr.${{ needs.setup.outputs.aws-region }}.amazonaws.com"
-          IMAGE_TAG="${{ inputs.image_tag }}"
+#           ECR_REGISTRY="${{ needs.setup.outputs.aws-account-id }}.dkr.ecr.${{ needs.setup.outputs.aws-region }}.amazonaws.com"
+#           IMAGE_TAG="${{ inputs.image_tag }}"
           
-          echo "cube-api-image=${ECR_REGISTRY}/${CUBE_API_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "cube-refresh-worker-image=${ECR_REGISTRY}/${CUBE_REFRESH_WORKER_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "cubestore-router-image=${ECR_REGISTRY}/${CUBESTORE_ROUTER_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "cubestore-worker-image=${ECR_REGISTRY}/${CUBESTORE_WORKER_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+#           echo "cube-api-image=${ECR_REGISTRY}/${CUBE_API_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+#           echo "cube-refresh-worker-image=${ECR_REGISTRY}/${CUBE_REFRESH_WORKER_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+#           echo "cubestore-router-image=${ECR_REGISTRY}/${CUBESTORE_ROUTER_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+#           echo "cubestore-worker-image=${ECR_REGISTRY}/${CUBESTORE_WORKER_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
           
-          echo "ecs-cluster=${ECS_CLUSTER}" >> $GITHUB_OUTPUT
-          echo "cube-api-service=${CUBE_API_SERVICE}" >> $GITHUB_OUTPUT
-          echo "cube-refresh-worker-service=${CUBE_REFRESH_WORKER_SERVICE}" >> $GITHUB_OUTPUT
-          echo "cubestore-router-service=${CUBESTORE_ROUTER_SERVICE}" >> $GITHUB_OUTPUT
-          echo "cubestore-worker-service=${CUBESTORE_WORKER_SERVICE}" >> $GITHUB_OUTPUT
+#           echo "ecs-cluster=${ECS_CLUSTER}" >> $GITHUB_OUTPUT
+#           echo "cube-api-service=${CUBE_API_SERVICE}" >> $GITHUB_OUTPUT
+#           echo "cube-refresh-worker-service=${CUBE_REFRESH_WORKER_SERVICE}" >> $GITHUB_OUTPUT
+#           echo "cubestore-router-service=${CUBESTORE_ROUTER_SERVICE}" >> $GITHUB_OUTPUT
+#           echo "cubestore-worker-service=${CUBESTORE_WORKER_SERVICE}" >> $GITHUB_OUTPUT
           
-          echo "🏷️ Using image tag: $IMAGE_TAG"
-          echo "🏢 ECS Cluster: $ECS_CLUSTER"
-          echo "📦 Images:"
-          echo "  - Cube API: ${ECR_REGISTRY}/${CUBE_API_REPO}:${IMAGE_TAG}"
-          echo "  - Refresh Worker: ${ECR_REGISTRY}/${CUBE_REFRESH_WORKER_REPO}:${IMAGE_TAG}"
-          echo "  - Cubestore Router: ${ECR_REGISTRY}/${CUBESTORE_ROUTER_REPO}:${IMAGE_TAG}"
-          echo "  - Cubestore Worker: ${ECR_REGISTRY}/${CUBESTORE_WORKER_REPO}:${IMAGE_TAG}"
+#           echo "🏷️ Using image tag: $IMAGE_TAG"
+#           echo "🏢 ECS Cluster: $ECS_CLUSTER"
+#           echo "📦 Images:"
+#           echo "  - Cube API: ${ECR_REGISTRY}/${CUBE_API_REPO}:${IMAGE_TAG}"
+#           echo "  - Refresh Worker: ${ECR_REGISTRY}/${CUBE_REFRESH_WORKER_REPO}:${IMAGE_TAG}"
+#           echo "  - Cubestore Router: ${ECR_REGISTRY}/${CUBESTORE_ROUTER_REPO}:${IMAGE_TAG}"
+#           echo "  - Cubestore Worker: ${ECR_REGISTRY}/${CUBESTORE_WORKER_REPO}:${IMAGE_TAG}"
 
-      - name: 🎯 Deploy Cube API to ECS
-        id: deploy-cube-api
-        run: |
-          set -euo pipefail
+#       - name: 🎯 Deploy Cube API to ECS
+#         id: deploy-cube-api
+#         run: |
+#           set -euo pipefail
           
-          SERVICE="${{ steps.image-tags.outputs.cube-api-service }}"
-          CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
-          NEW_IMAGE="${{ steps.image-tags.outputs.cube-api-image }}"
+#           SERVICE="${{ steps.image-tags.outputs.cube-api-service }}"
+#           CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
+#           NEW_IMAGE="${{ steps.image-tags.outputs.cube-api-image }}"
           
-          echo "🚀 Deploying Cube API to ECS..."
-          echo "🏢 Cluster: $CLUSTER"
-          echo "🚀 Service: $SERVICE" 
-          echo "🖼️ New Image: $NEW_IMAGE"
+#           echo "🚀 Deploying Cube API to ECS..."
+#           echo "🏢 Cluster: $CLUSTER"
+#           echo "🚀 Service: $SERVICE" 
+#           echo "🖼️ New Image: $NEW_IMAGE"
           
-          # Get current task definition
-          CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
-          echo "📋 Current Task Definition: $CURRENT_TD_ARN"
+#           # Get current task definition
+#           CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
+#           echo "📋 Current Task Definition: $CURRENT_TD_ARN"
           
-          # Save current task definition for rollback
-          echo "current-cube-api-td=$CURRENT_TD_ARN" >> $GITHUB_OUTPUT
+#           # Save current task definition for rollback
+#           echo "current-cube-api-td=$CURRENT_TD_ARN" >> $GITHUB_OUTPUT
           
-          # Download and update task definition
-          aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > cube-api-current-td.json
+#           # Download and update task definition
+#           aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > cube-api-current-td.json
           
-          # Create new task definition with updated image and secrets
-          jq --arg NEW_IMAGE "$NEW_IMAGE" \
-             --arg API_SECRET "${{ steps.get-secrets.outputs.cubejs-api-secret }}" \
-             --arg DB_HOST "${{ steps.get-secrets.outputs.cubejs-db-host }}" \
-             --arg DB_NAME "${{ steps.get-secrets.outputs.cubejs-db-name }}" \
-             --arg DB_USER "${{ steps.get-secrets.outputs.cubejs-db-user }}" \
-             --arg DB_PASS "${{ steps.get-secrets.outputs.cubejs-db-pass }}" \
-             --arg ENVIRONMENT "${{ inputs.environment }}" \
-             --arg BUILD_NUMBER "${{ github.run_number }}" '
-            .containerDefinitions[0].image = $NEW_IMAGE |
-            .containerDefinitions[0].environment = (
-              (.containerDefinitions[0].environment // []) | 
-              map(select(.name | test("^(CUBEJS_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
-                {"name": "CUBEJS_API_SECRET", "value": $API_SECRET},
-                {"name": "CUBEJS_DB_TYPE", "value": "mssql"},
-                {"name": "CUBEJS_DEV_MODE", "value": "false"},
-                {"name": "CUBEJS_DB_HOST", "value": $DB_HOST},
-                {"name": "CUBEJS_DB_NAME", "value": $DB_NAME},
-                {"name": "CUBEJS_DB_USER", "value": $DB_USER},
-                {"name": "CUBEJS_DB_PASS", "value": $DB_PASS},
-                {"name": "CUBEJS_DB_SSL", "value": "true"},
-                {"name": "CUBEJS_DEFAULT_API_SCOPES", "value": "graphql,meta,data,jobs"},
-                {"name": "CUBEJS_CUBESTORE_HOST", "value": "cubestore-router"},
-                {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
-                {"name": "CUBEJS_ENVIRONMENT", "value": $ENVIRONMENT},
-                {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
-              ]
-            ) |
-            del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
-          ' cube-api-current-td.json > cube-api-new-td.json
+#           # Create new task definition with updated image and secrets
+#           jq --arg NEW_IMAGE "$NEW_IMAGE" \
+#              --arg API_SECRET "${{ steps.get-secrets.outputs.cubejs-api-secret }}" \
+#              --arg DB_HOST "${{ steps.get-secrets.outputs.cubejs-db-host }}" \
+#              --arg DB_NAME "${{ steps.get-secrets.outputs.cubejs-db-name }}" \
+#              --arg DB_USER "${{ steps.get-secrets.outputs.cubejs-db-user }}" \
+#              --arg DB_PASS "${{ steps.get-secrets.outputs.cubejs-db-pass }}" \
+#              --arg ENVIRONMENT "${{ inputs.environment }}" \
+#              --arg BUILD_NUMBER "${{ github.run_number }}" '
+#             .containerDefinitions[0].image = $NEW_IMAGE |
+#             .containerDefinitions[0].environment = (
+#               (.containerDefinitions[0].environment // []) | 
+#               map(select(.name | test("^(CUBEJS_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
+#                 {"name": "CUBEJS_API_SECRET", "value": $API_SECRET},
+#                 {"name": "CUBEJS_DB_TYPE", "value": "mssql"},
+#                 {"name": "CUBEJS_DEV_MODE", "value": "false"},
+#                 {"name": "CUBEJS_DB_HOST", "value": $DB_HOST},
+#                 {"name": "CUBEJS_DB_NAME", "value": $DB_NAME},
+#                 {"name": "CUBEJS_DB_USER", "value": $DB_USER},
+#                 {"name": "CUBEJS_DB_PASS", "value": $DB_PASS},
+#                 {"name": "CUBEJS_DB_SSL", "value": "true"},
+#                 {"name": "CUBEJS_DEFAULT_API_SCOPES", "value": "graphql,meta,data,jobs"},
+#                 {"name": "CUBEJS_CUBESTORE_HOST", "value": "cubestore-router"},
+#                 {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
+#                 {"name": "CUBEJS_ENVIRONMENT", "value": $ENVIRONMENT},
+#                 {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
+#               ]
+#             ) |
+#             del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+#           ' cube-api-current-td.json > cube-api-new-td.json
           
-          # Register new task definition
-          NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://cube-api-new-td.json --query taskDefinition.taskDefinitionArn --output text)
-          echo "✅ New Task Definition registered: $NEW_TD_ARN"
-          echo "new-cube-api-td=$NEW_TD_ARN" >> $GITHUB_OUTPUT
+#           # Register new task definition
+#           NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://cube-api-new-td.json --query taskDefinition.taskDefinitionArn --output text)
+#           echo "✅ New Task Definition registered: $NEW_TD_ARN"
+#           echo "new-cube-api-td=$NEW_TD_ARN" >> $GITHUB_OUTPUT
           
-          # Update ECS service
-          echo "🔄 Updating ECS service..."
-          aws ecs update-service \
-            --cluster "$CLUSTER" \
-            --service "$SERVICE" \
-            --task-definition "$NEW_TD_ARN" \
-            --force-new-deployment
+#           # Update ECS service
+#           echo "🔄 Updating ECS service..."
+#           aws ecs update-service \
+#             --cluster "$CLUSTER" \
+#             --service "$SERVICE" \
+#             --task-definition "$NEW_TD_ARN" \
+#             --force-new-deployment
           
-          echo "✅ Cube API deployment initiated"
+#           echo "✅ Cube API deployment initiated"
 
-      - name: 🎯 Deploy Cube Refresh Worker to ECS
-        id: deploy-cube-refresh-worker
-        run: |
-          set -euo pipefail
+#       - name: 🎯 Deploy Cube Refresh Worker to ECS
+#         id: deploy-cube-refresh-worker
+#         run: |
+#           set -euo pipefail
           
-          SERVICE="${{ steps.image-tags.outputs.cube-refresh-worker-service }}"
-          CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
-          NEW_IMAGE="${{ steps.image-tags.outputs.cube-refresh-worker-image }}"
+#           SERVICE="${{ steps.image-tags.outputs.cube-refresh-worker-service }}"
+#           CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
+#           NEW_IMAGE="${{ steps.image-tags.outputs.cube-refresh-worker-image }}"
           
-          echo "🚀 Deploying Cube Refresh Worker to ECS..."
-          echo "🏢 Cluster: $CLUSTER"
-          echo "🚀 Service: $SERVICE" 
-          echo "🖼️ New Image: $NEW_IMAGE"
+#           echo "🚀 Deploying Cube Refresh Worker to ECS..."
+#           echo "🏢 Cluster: $CLUSTER"
+#           echo "🚀 Service: $SERVICE" 
+#           echo "🖼️ New Image: $NEW_IMAGE"
           
-          # Get current task definition
-          CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
-          echo "📋 Current Task Definition: $CURRENT_TD_ARN"
+#           # Get current task definition
+#           CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
+#           echo "📋 Current Task Definition: $CURRENT_TD_ARN"
           
-          # Save current task definition for rollback
-          echo "current-refresh-worker-td=$CURRENT_TD_ARN" >> $GITHUB_OUTPUT
+#           # Save current task definition for rollback
+#           echo "current-refresh-worker-td=$CURRENT_TD_ARN" >> $GITHUB_OUTPUT
           
-          # Download and update task definition
-          aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > refresh-worker-current-td.json
+#           # Download and update task definition
+#           aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > refresh-worker-current-td.json
           
-          # Create new task definition with updated image and secrets
-          jq --arg NEW_IMAGE "$NEW_IMAGE" \
-             --arg API_SECRET "${{ steps.get-secrets.outputs.cubejs-api-secret }}" \
-             --arg DB_HOST "${{ steps.get-secrets.outputs.cubejs-db-host }}" \
-             --arg DB_NAME "${{ steps.get-secrets.outputs.cubejs-db-name }}" \
-             --arg DB_USER "${{ steps.get-secrets.outputs.cubejs-db-user }}" \
-             --arg DB_PASS "${{ steps.get-secrets.outputs.cubejs-db-pass }}" \
-             --arg ENVIRONMENT "${{ inputs.environment }}" \
-             --arg BUILD_NUMBER "${{ github.run_number }}" '
-            .containerDefinitions[0].image = $NEW_IMAGE |
-            .containerDefinitions[0].environment = (
-              (.containerDefinitions[0].environment // []) | 
-              map(select(.name | test("^(CUBEJS_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
-                {"name": "CUBEJS_API_SECRET", "value": $API_SECRET},
-                {"name": "CUBEJS_DB_TYPE", "value": "mssql"},
-                {"name": "CUBEJS_DEV_MODE", "value": "false"},
-                {"name": "CUBEJS_DB_HOST", "value": $DB_HOST},
-                {"name": "CUBEJS_DB_NAME", "value": $DB_NAME},
-                {"name": "CUBEJS_DB_USER", "value": $DB_USER},
-                {"name": "CUBEJS_DB_PASS", "value": $DB_PASS},
-                {"name": "CUBEJS_DB_SSL", "value": "true"},
-                {"name": "CUBEJS_DEFAULT_API_SCOPES", "value": "graphql,meta,data,jobs"},
-                {"name": "CUBEJS_CUBESTORE_HOST", "value": "cubestore-router"},
-                {"name": "CUBEJS_REFRESH_WORKER", "value": "true"},
-                {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
-                {"name": "CUBEJS_ENVIRONMENT", "value": $ENVIRONMENT},
-                {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
-              ]
-            ) |
-            del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
-          ' refresh-worker-current-td.json > refresh-worker-new-td.json
+#           # Create new task definition with updated image and secrets
+#           jq --arg NEW_IMAGE "$NEW_IMAGE" \
+#              --arg API_SECRET "${{ steps.get-secrets.outputs.cubejs-api-secret }}" \
+#              --arg DB_HOST "${{ steps.get-secrets.outputs.cubejs-db-host }}" \
+#              --arg DB_NAME "${{ steps.get-secrets.outputs.cubejs-db-name }}" \
+#              --arg DB_USER "${{ steps.get-secrets.outputs.cubejs-db-user }}" \
+#              --arg DB_PASS "${{ steps.get-secrets.outputs.cubejs-db-pass }}" \
+#              --arg ENVIRONMENT "${{ inputs.environment }}" \
+#              --arg BUILD_NUMBER "${{ github.run_number }}" '
+#             .containerDefinitions[0].image = $NEW_IMAGE |
+#             .containerDefinitions[0].environment = (
+#               (.containerDefinitions[0].environment // []) | 
+#               map(select(.name | test("^(CUBEJS_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
+#                 {"name": "CUBEJS_API_SECRET", "value": $API_SECRET},
+#                 {"name": "CUBEJS_DB_TYPE", "value": "mssql"},
+#                 {"name": "CUBEJS_DEV_MODE", "value": "false"},
+#                 {"name": "CUBEJS_DB_HOST", "value": $DB_HOST},
+#                 {"name": "CUBEJS_DB_NAME", "value": $DB_NAME},
+#                 {"name": "CUBEJS_DB_USER", "value": $DB_USER},
+#                 {"name": "CUBEJS_DB_PASS", "value": $DB_PASS},
+#                 {"name": "CUBEJS_DB_SSL", "value": "true"},
+#                 {"name": "CUBEJS_DEFAULT_API_SCOPES", "value": "graphql,meta,data,jobs"},
+#                 {"name": "CUBEJS_CUBESTORE_HOST", "value": "cubestore-router"},
+#                 {"name": "CUBEJS_REFRESH_WORKER", "value": "true"},
+#                 {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
+#                 {"name": "CUBEJS_ENVIRONMENT", "value": $ENVIRONMENT},
+#                 {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
+#               ]
+#             ) |
+#             del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+#           ' refresh-worker-current-td.json > refresh-worker-new-td.json
           
-          # Register new task definition
-          NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://refresh-worker-new-td.json --query taskDefinition.taskDefinitionArn --output text)
-          echo "✅ New Task Definition registered: $NEW_TD_ARN"
-          echo "new-refresh-worker-td=$NEW_TD_ARN" >> $GITHUB_OUTPUT
+#           # Register new task definition
+#           NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://refresh-worker-new-td.json --query taskDefinition.taskDefinitionArn --output text)
+#           echo "✅ New Task Definition registered: $NEW_TD_ARN"
+#           echo "new-refresh-worker-td=$NEW_TD_ARN" >> $GITHUB_OUTPUT
           
-          # Update ECS service
-          echo "🔄 Updating ECS service..."
-          aws ecs update-service \
-            --cluster "$CLUSTER" \
-            --service "$SERVICE" \
-            --task-definition "$NEW_TD_ARN" \
-            --force-new-deployment
+#           # Update ECS service
+#           echo "🔄 Updating ECS service..."
+#           aws ecs update-service \
+#             --cluster "$CLUSTER" \
+#             --service "$SERVICE" \
+#             --task-definition "$NEW_TD_ARN" \
+#             --force-new-deployment
           
-          echo "✅ Cube Refresh Worker deployment initiated"
+#           echo "✅ Cube Refresh Worker deployment initiated"
 
-      - name: 🎯 Deploy Cubestore Router to ECS
-        id: deploy-cubestore-router
-        run: |
-          set -euo pipefail
+#       - name: 🎯 Deploy Cubestore Router to ECS
+#         id: deploy-cubestore-router
+#         run: |
+#           set -euo pipefail
           
-          SERVICE="${{ steps.image-tags.outputs.cubestore-router-service }}"
-          CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
-          NEW_IMAGE="${{ steps.image-tags.outputs.cubestore-router-image }}"
+#           SERVICE="${{ steps.image-tags.outputs.cubestore-router-service }}"
+#           CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
+#           NEW_IMAGE="${{ steps.image-tags.outputs.cubestore-router-image }}"
           
-          echo "🚀 Deploying Cubestore Router to ECS..."
-          echo "🏢 Cluster: $CLUSTER"
-          echo "🚀 Service: $SERVICE" 
-          echo "🖼️ New Image: $NEW_IMAGE"
+#           echo "🚀 Deploying Cubestore Router to ECS..."
+#           echo "🏢 Cluster: $CLUSTER"
+#           echo "🚀 Service: $SERVICE" 
+#           echo "🖼️ New Image: $NEW_IMAGE"
           
-          # Get current task definition
-          CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
-          echo "📋 Current Task Definition: $CURRENT_TD_ARN"
+#           # Get current task definition
+#           CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
+#           echo "📋 Current Task Definition: $CURRENT_TD_ARN"
           
-          # Save current task definition for rollback
-          echo "current-router-td=$CURRENT_TD_ARN" >> $GITHUB_OUTPUT
+#           # Save current task definition for rollback
+#           echo "current-router-td=$CURRENT_TD_ARN" >> $GITHUB_OUTPUT
           
-          # Download and update task definition
-          aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > router-current-td.json
+#           # Download and update task definition
+#           aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > router-current-td.json
           
-          # Create new task definition with updated image and environment
-          jq --arg NEW_IMAGE "$NEW_IMAGE" \
-             --arg ENVIRONMENT "${{ inputs.environment }}" \
-             --arg BUILD_NUMBER "${{ github.run_number }}" '
-            .containerDefinitions[0].image = $NEW_IMAGE |
-            .containerDefinitions[0].environment = (
-              (.containerDefinitions[0].environment // []) | 
-              map(select(.name | test("^(CUBESTORE_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
-                {"name": "CUBESTORE_REMOTE_DIR", "value": "/cube/data"},
-                {"name": "CUBESTORE_META_PORT", "value": "9999"},
-                {"name": "CUBESTORE_SERVER_NAME", "value": "cubestore-router:9999"},
-                {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
-                {"name": "CUBESTORE_ENVIRONMENT", "value": $ENVIRONMENT},
-                {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
-              ]
-            ) |
-            del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
-          ' router-current-td.json > router-new-td.json
+#           # Create new task definition with updated image and environment
+#           jq --arg NEW_IMAGE "$NEW_IMAGE" \
+#              --arg ENVIRONMENT "${{ inputs.environment }}" \
+#              --arg BUILD_NUMBER "${{ github.run_number }}" '
+#             .containerDefinitions[0].image = $NEW_IMAGE |
+#             .containerDefinitions[0].environment = (
+#               (.containerDefinitions[0].environment // []) | 
+#               map(select(.name | test("^(CUBESTORE_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
+#                 {"name": "CUBESTORE_REMOTE_DIR", "value": "/cube/data"},
+#                 {"name": "CUBESTORE_META_PORT", "value": "9999"},
+#                 {"name": "CUBESTORE_SERVER_NAME", "value": "cubestore-router:9999"},
+#                 {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
+#                 {"name": "CUBESTORE_ENVIRONMENT", "value": $ENVIRONMENT},
+#                 {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
+#               ]
+#             ) |
+#             del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+#           ' router-current-td.json > router-new-td.json
           
-          # Register new task definition
-          NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://router-new-td.json --query taskDefinition.taskDefinitionArn --output text)
-          echo "✅ New Task Definition registered: $NEW_TD_ARN"
-          echo "new-router-td=$NEW_TD_ARN" >> $GITHUB_OUTPUT
+#           # Register new task definition
+#           NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://router-new-td.json --query taskDefinition.taskDefinitionArn --output text)
+#           echo "✅ New Task Definition registered: $NEW_TD_ARN"
+#           echo "new-router-td=$NEW_TD_ARN" >> $GITHUB_OUTPUT
           
-          # Update ECS service
-          echo "🔄 Updating ECS service..."
-          aws ecs update-service \
-            --cluster "$CLUSTER" \
-            --service "$SERVICE" \
-            --task-definition "$NEW_TD_ARN" \
-            --force-new-deployment
+#           # Update ECS service
+#           echo "🔄 Updating ECS service..."
+#           aws ecs update-service \
+#             --cluster "$CLUSTER" \
+#             --service "$SERVICE" \
+#             --task-definition "$NEW_TD_ARN" \
+#             --force-new-deployment
           
-          echo "✅ Cubestore Router deployment initiated"
+#           echo "✅ Cubestore Router deployment initiated"
 
-      - name: 🎯 Deploy Cubestore Worker to ECS
-        id: deploy-cubestore-worker
-        run: |
-          set -euo pipefail
+#       - name: 🎯 Deploy Cubestore Worker to ECS
+#         id: deploy-cubestore-worker
+#         run: |
+#           set -euo pipefail
           
-          SERVICE="${{ steps.image-tags.outputs.cubestore-worker-service }}"
-          CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
-          NEW_IMAGE="${{ steps.image-tags.outputs.cubestore-worker-image }}"
+#           SERVICE="${{ steps.image-tags.outputs.cubestore-worker-service }}"
+#           CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
+#           NEW_IMAGE="${{ steps.image-tags.outputs.cubestore-worker-image }}"
           
-          echo "🚀 Deploying Cubestore Worker to ECS..."
-          echo "🏢 Cluster: $CLUSTER"
-          echo "🚀 Service: $SERVICE" 
-          echo "🖼️ New Image: $NEW_IMAGE"
+#           echo "🚀 Deploying Cubestore Worker to ECS..."
+#           echo "🏢 Cluster: $CLUSTER"
+#           echo "🚀 Service: $SERVICE" 
+#           echo "🖼️ New Image: $NEW_IMAGE"
           
-          # Get current task definition
-          CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
-          echo "📋 Current Task Definition: $CURRENT_TD_ARN"
+#           # Get current task definition
+#           CURRENT_TD_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
+#           echo "📋 Current Task Definition: $CURRENT_TD_ARN"
           
-          # Save current task definition for rollback
-          echo "current-worker-td=$CURRENT_TD_ARN" >> $GITHUB_OUTPUT
+#           # Save current task definition for rollback
+#           echo "current-worker-td=$CURRENT_TD_ARN" >> $GITHUB_OUTPUT
           
-          # Download and update task definition
-          aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > worker-current-td.json
+#           # Download and update task definition
+#           aws ecs describe-task-definition --task-definition "$CURRENT_TD_ARN" --query taskDefinition > worker-current-td.json
           
-          # Create new task definition with updated image and environment
-          jq --arg NEW_IMAGE "$NEW_IMAGE" \
-             --arg ENVIRONMENT "${{ inputs.environment }}" \
-             --arg BUILD_NUMBER "${{ github.run_number }}" '
-            .containerDefinitions[0].image = $NEW_IMAGE |
-            .containerDefinitions[0].environment = (
-              (.containerDefinitions[0].environment // []) | 
-              map(select(.name | test("^(CUBESTORE_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
-                {"name": "CUBESTORE_SERVER_NAME", "value": "cubestore-worker-0.cubestore-worker:10001"},
-                {"name": "CUBESTORE_WORKER_PORT", "value": "10001"},
-                {"name": "CUBESTORE_REMOTE_DIR", "value": "/cube/data"},
-                {"name": "CUBESTORE_META_ADDR", "value": "cubestore-router:9999"},
-                {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
-                {"name": "CUBESTORE_ENVIRONMENT", "value": $ENVIRONMENT},
-                {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
-              ]
-            ) |
-            del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
-          ' worker-current-td.json > worker-new-td.json
+#           # Create new task definition with updated image and environment
+#           jq --arg NEW_IMAGE "$NEW_IMAGE" \
+#              --arg ENVIRONMENT "${{ inputs.environment }}" \
+#              --arg BUILD_NUMBER "${{ github.run_number }}" '
+#             .containerDefinitions[0].image = $NEW_IMAGE |
+#             .containerDefinitions[0].environment = (
+#               (.containerDefinitions[0].environment // []) | 
+#               map(select(.name | test("^(CUBESTORE_|BUILD_NUMBER|ENVIRONMENT).*") | not)) + [
+#                 {"name": "CUBESTORE_SERVER_NAME", "value": "cubestore-worker-0.cubestore-worker:10001"},
+#                 {"name": "CUBESTORE_WORKER_PORT", "value": "10001"},
+#                 {"name": "CUBESTORE_REMOTE_DIR", "value": "/cube/data"},
+#                 {"name": "CUBESTORE_META_ADDR", "value": "cubestore-router:9999"},
+#                 {"name": "CUBEJS_LOG_LEVEL", "value": "info"},
+#                 {"name": "CUBESTORE_ENVIRONMENT", "value": $ENVIRONMENT},
+#                 {"name": "BUILD_NUMBER", "value": $BUILD_NUMBER}
+#               ]
+#             ) |
+#             del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+#           ' worker-current-td.json > worker-new-td.json
           
-          # Register new task definition
-          NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://worker-new-td.json --query taskDefinition.taskDefinitionArn --output text)
-          echo "✅ New Task Definition registered: $NEW_TD_ARN"
-          echo "new-worker-td=$NEW_TD_ARN" >> $GITHUB_OUTPUT
+#           # Register new task definition
+#           NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://worker-new-td.json --query taskDefinition.taskDefinitionArn --output text)
+#           echo "✅ New Task Definition registered: $NEW_TD_ARN"
+#           echo "new-worker-td=$NEW_TD_ARN" >> $GITHUB_OUTPUT
           
-          # Update ECS service
-          echo "🔄 Updating ECS service..."
-          aws ecs update-service \
-            --cluster "$CLUSTER" \
-            --service "$SERVICE" \
-            --task-definition "$NEW_TD_ARN" \
-            --force-new-deployment
+#           # Update ECS service
+#           echo "🔄 Updating ECS service..."
+#           aws ecs update-service \
+#             --cluster "$CLUSTER" \
+#             --service "$SERVICE" \
+#             --task-definition "$NEW_TD_ARN" \
+#             --force-new-deployment
           
-          echo "✅ Cubestore Worker deployment initiated"
+#           echo "✅ Cubestore Worker deployment initiated"
 
-      - name: ⏳ Wait for Deployments to Stabilize
-        id: wait-deployments
-        run: |
-          set -euo pipefail
+#       - name: ⏳ Wait for Deployments to Stabilize
+#         id: wait-deployments
+#         run: |
+#           set -euo pipefail
           
-          CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
-          CUBE_API_SERVICE="${{ steps.image-tags.outputs.cube-api-service }}"
-          REFRESH_WORKER_SERVICE="${{ steps.image-tags.outputs.cube-refresh-worker-service }}"
-          ROUTER_SERVICE="${{ steps.image-tags.outputs.cubestore-router-service }}"
-          WORKER_SERVICE="${{ steps.image-tags.outputs.cubestore-worker-service }}"
+#           CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
+#           CUBE_API_SERVICE="${{ steps.image-tags.outputs.cube-api-service }}"
+#           REFRESH_WORKER_SERVICE="${{ steps.image-tags.outputs.cube-refresh-worker-service }}"
+#           ROUTER_SERVICE="${{ steps.image-tags.outputs.cubestore-router-service }}"
+#           WORKER_SERVICE="${{ steps.image-tags.outputs.cubestore-worker-service }}"
           
-          echo "⏳ Waiting for all services to stabilize..."
-          echo "🏢 Cluster: $CLUSTER"
+#           echo "⏳ Waiting for all services to stabilize..."
+#           echo "🏢 Cluster: $CLUSTER"
           
-          DEPLOYMENT_SUCCESS=true
+#           DEPLOYMENT_SUCCESS=true
           
-          # Wait for each service with timeout
-          for service in "$CUBE_API_SERVICE" "$REFRESH_WORKER_SERVICE" "$ROUTER_SERVICE" "$WORKER_SERVICE"; do
-            echo "⏳ Waiting for $service to stabilize..."
+#           # Wait for each service with timeout
+#           for service in "$CUBE_API_SERVICE" "$REFRESH_WORKER_SERVICE" "$ROUTER_SERVICE" "$WORKER_SERVICE"; do
+#             echo "⏳ Waiting for $service to stabilize..."
             
-            if aws ecs wait services-stable --cluster "$CLUSTER" --services "$service" --cli-read-timeout 900; then
-              echo "✅ $service deployment successful"
+#             if aws ecs wait services-stable --cluster "$CLUSTER" --services "$service" --cli-read-timeout 900; then
+#               echo "✅ $service deployment successful"
               
-              # Verify service health
-              RUNNING_COUNT=$(aws ecs describe-services --cluster "$CLUSTER" --services "$service" --query 'services[0].runningCount' --output text)
-              DESIRED_COUNT=$(aws ecs describe-services --cluster "$CLUSTER" --services "$service" --query 'services[0].desiredCount' --output text)
+#               # Verify service health
+#               RUNNING_COUNT=$(aws ecs describe-services --cluster "$CLUSTER" --services "$service" --query 'services[0].runningCount' --output text)
+#               DESIRED_COUNT=$(aws ecs describe-services --cluster "$CLUSTER" --services "$service" --query 'services[0].desiredCount' --output text)
               
-              if [ "$RUNNING_COUNT" -eq "$DESIRED_COUNT" ]; then
-                echo "✅ $service health check passed ($RUNNING_COUNT/$DESIRED_COUNT tasks running)"
-              else
-                echo "❌ $service health check failed ($RUNNING_COUNT/$DESIRED_COUNT tasks running)"
-                DEPLOYMENT_SUCCESS=false
-              fi
-            else
-              echo "❌ $service deployment failed or timed out"
-              DEPLOYMENT_SUCCESS=false
-            fi
-          done
+#               if [ "$RUNNING_COUNT" -eq "$DESIRED_COUNT" ]; then
+#                 echo "✅ $service health check passed ($RUNNING_COUNT/$DESIRED_COUNT tasks running)"
+#               else
+#                 echo "❌ $service health check failed ($RUNNING_COUNT/$DESIRED_COUNT tasks running)"
+#                 DEPLOYMENT_SUCCESS=false
+#               fi
+#             else
+#               echo "❌ $service deployment failed or timed out"
+#               DEPLOYMENT_SUCCESS=false
+#             fi
+#           done
           
-          if [ "$DEPLOYMENT_SUCCESS" = false ]; then
-            echo "deployment-success=false" >> $GITHUB_OUTPUT
-            echo "❌ One or more deployments failed"
-            exit 1
-          else
-            echo "deployment-success=true" >> $GITHUB_OUTPUT
-            echo "✅ All deployments completed successfully"
-          fi
+#           if [ "$DEPLOYMENT_SUCCESS" = false ]; then
+#             echo "deployment-success=false" >> $GITHUB_OUTPUT
+#             echo "❌ One or more deployments failed"
+#             exit 1
+#           else
+#             echo "deployment-success=true" >> $GITHUB_OUTPUT
+#             echo "✅ All deployments completed successfully"
+#           fi
 
-      - name: 🔍 Verify Deployment
-        if: steps.wait-deployments.outputs.deployment-success == 'true'
-        run: |
-          CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
-          CUBE_API_SERVICE="${{ steps.image-tags.outputs.cube-api-service }}"
-          REFRESH_WORKER_SERVICE="${{ steps.image-tags.outputs.cube-refresh-worker-service }}"
-          ROUTER_SERVICE="${{ steps.image-tags.outputs.cubestore-router-service }}"
-          WORKER_SERVICE="${{ steps.image-tags.outputs.cubestore-worker-service }}"
+#       - name: 🔍 Verify Deployment
+#         if: steps.wait-deployments.outputs.deployment-success == 'true'
+#         run: |
+#           CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
+#           CUBE_API_SERVICE="${{ steps.image-tags.outputs.cube-api-service }}"
+#           REFRESH_WORKER_SERVICE="${{ steps.image-tags.outputs.cube-refresh-worker-service }}"
+#           ROUTER_SERVICE="${{ steps.image-tags.outputs.cubestore-router-service }}"
+#           WORKER_SERVICE="${{ steps.image-tags.outputs.cubestore-worker-service }}"
           
-          echo "🔍 Verifying deployment in ECS cluster: $CLUSTER"
+#           echo "🔍 Verifying deployment in ECS cluster: $CLUSTER"
           
-          # Verify all services
-          for service in "$CUBE_API_SERVICE" "$REFRESH_WORKER_SERVICE" "$ROUTER_SERVICE" "$WORKER_SERVICE"; do
-            echo "📊 Checking service: $service"
+#           # Verify all services
+#           for service in "$CUBE_API_SERVICE" "$REFRESH_WORKER_SERVICE" "$ROUTER_SERVICE" "$WORKER_SERVICE"; do
+#             echo "📊 Checking service: $service"
             
-            SERVICE_INFO=$(aws ecs describe-services \
-              --cluster "$CLUSTER" \
-              --services "$service" \
-              --query 'services[0].{
-                Status: status,
-                RunningCount: runningCount,
-                DesiredCount: desiredCount,
-                TaskDefinition: taskDefinition
-              }' \
-              --output json)
+#             SERVICE_INFO=$(aws ecs describe-services \
+#               --cluster "$CLUSTER" \
+#               --services "$service" \
+#               --query 'services[0].{
+#                 Status: status,
+#                 RunningCount: runningCount,
+#                 DesiredCount: desiredCount,
+#                 TaskDefinition: taskDefinition
+#               }' \
+#               --output json)
             
-            STATUS=$(echo "$SERVICE_INFO" | jq -r '.Status')
-            RUNNING=$(echo "$SERVICE_INFO" | jq -r '.RunningCount')
-            DESIRED=$(echo "$SERVICE_INFO" | jq -r '.DesiredCount')
-            TASK_DEF=$(echo "$SERVICE_INFO" | jq -r '.TaskDefinition')
+#             STATUS=$(echo "$SERVICE_INFO" | jq -r '.Status')
+#             RUNNING=$(echo "$SERVICE_INFO" | jq -r '.RunningCount')
+#             DESIRED=$(echo "$SERVICE_INFO" | jq -r '.DesiredCount')
+#             TASK_DEF=$(echo "$SERVICE_INFO" | jq -r '.TaskDefinition')
             
-            echo "  Status: $STATUS"
-            echo "  Tasks: $RUNNING/$DESIRED"
-            echo "  Task Definition: $TASK_DEF"
+#             echo "  Status: $STATUS"
+#             echo "  Tasks: $RUNNING/$DESIRED"
+#             echo "  Task Definition: $TASK_DEF"
             
-            if [ "$STATUS" = "ACTIVE" ] && [ "$RUNNING" -eq "$DESIRED" ]; then
-              echo "✅ $service verified successfully"
-            else
-              echo "❌ $service verification failed"
-              exit 1
-            fi
-          done
+#             if [ "$STATUS" = "ACTIVE" ] && [ "$RUNNING" -eq "$DESIRED" ]; then
+#               echo "✅ $service verified successfully"
+#             else
+#               echo "❌ $service verification failed"
+#               exit 1
+#             fi
+#           done
           
-          echo "✅ All services verified successfully!"
+#           echo "✅ All services verified successfully!"
 
-      - name: 🔄 Rollback on Failure
-        if: failure() && steps.wait-deployments.outputs.deployment-success == 'false'
-        run: |
-          set -euo pipefail
+#       - name: 🔄 Rollback on Failure
+#         if: failure() && steps.wait-deployments.outputs.deployment-success == 'false'
+#         run: |
+#           set -euo pipefail
           
-          echo "❌ Deployment failed. Initiating rollback..."
+#           echo "❌ Deployment failed. Initiating rollback..."
           
-          CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
+#           CLUSTER="${{ steps.image-tags.outputs.ecs-cluster }}"
           
-          # Define services and their previous task definitions
-          declare -A ROLLBACK_MAP
-          ROLLBACK_MAP["${{ steps.image-tags.outputs.cube-api-service }}"]="${{ steps.deploy-cube-api.outputs.current-cube-api-td }}"
-          ROLLBACK_MAP["${{ steps.image-tags.outputs.cube-refresh-worker-service }}"]="${{ steps.deploy-cube-refresh-worker.outputs.current-refresh-worker-td }}"
-          ROLLBACK_MAP["${{ steps.image-tags.outputs.cubestore-router-service }}"]="${{ steps.deploy-cubestore-router.outputs.current-router-td }}"
-          ROLLBACK_MAP["${{ steps.image-tags.outputs.cubestore-worker-service }}"]="${{ steps.deploy-cubestore-worker.outputs.current-worker-td }}"
+#           # Define services and their previous task definitions
+#           declare -A ROLLBACK_MAP
+#           ROLLBACK_MAP["${{ steps.image-tags.outputs.cube-api-service }}"]="${{ steps.deploy-cube-api.outputs.current-cube-api-td }}"
+#           ROLLBACK_MAP["${{ steps.image-tags.outputs.cube-refresh-worker-service }}"]="${{ steps.deploy-cube-refresh-worker.outputs.current-refresh-worker-td }}"
+#           ROLLBACK_MAP["${{ steps.image-tags.outputs.cubestore-router-service }}"]="${{ steps.deploy-cubestore-router.outputs.current-router-td }}"
+#           ROLLBACK_MAP["${{ steps.image-tags.outputs.cubestore-worker-service }}"]="${{ steps.deploy-cubestore-worker.outputs.current-worker-td }}"
           
-          # Rollback each service
-          for service in "${!ROLLBACK_MAP[@]}"; do
-            previous_td="${ROLLBACK_MAP[$service]}"
+#           # Rollback each service
+#           for service in "${!ROLLBACK_MAP[@]}"; do
+#             previous_td="${ROLLBACK_MAP[$service]}"
             
-            if [ -n "$previous_td" ] && [ "$previous_td" != "None" ]; then
-              echo "🔄 Rolling back $service to $previous_td"
+#             if [ -n "$previous_td" ] && [ "$previous_td" != "None" ]; then
+#               echo "🔄 Rolling back $service to $previous_td"
               
-              aws ecs update-service \
-                --cluster "$CLUSTER" \
-                --service "$service" \
-                --task-definition "$previous_td" \
-                --force-new-deployment
+#               aws ecs update-service \
+#                 --cluster "$CLUSTER" \
+#                 --service "$service" \
+#                 --task-definition "$previous_td" \
+#                 --force-new-deployment
               
-              echo "✅ Rollback initiated for $service"
-            else
-              echo "⚠️ No previous task definition found for $service"
-            fi
-          done
+#               echo "✅ Rollback initiated for $service"
+#             else
+#               echo "⚠️ No previous task definition found for $service"
+#             fi
+#           done
           
-          echo "⏳ Waiting for rollback to complete..."
+#           echo "⏳ Waiting for rollback to complete..."
           
-          # Wait for rollback to stabilize
-          for service in "${!ROLLBACK_MAP[@]}"; do
-            echo "⏳ Waiting for $service rollback to stabilize..."
-            if aws ecs wait services-stable --cluster "$CLUSTER" --services "$service" --cli-read-timeout 600; then
-              echo "✅ $service rolled back successfully"
-            else
-              echo "❌ $service rollback failed or timed out"
-            fi
-          done
+#           # Wait for rollback to stabilize
+#           for service in "${!ROLLBACK_MAP[@]}"; do
+#             echo "⏳ Waiting for $service rollback to stabilize..."
+#             if aws ecs wait services-stable --cluster "$CLUSTER" --services "$service" --cli-read-timeout 600; then
+#               echo "✅ $service rolled back successfully"
+#             else
+#               echo "❌ $service rollback failed or timed out"
+#             fi
+#           done
           
-          echo "🔄 Rollback completed"
-          exit 1
+#           echo "🔄 Rollback completed"
+#           exit 1
 
-      - name: 🧹 Cleanup
-        if: always()
-        run: |
-          # Remove task definition files containing secrets
-          rm -f *-current-td.json *-new-td.json
-          echo "🧹 Cleaned up temporary files"
+#       - name: 🧹 Cleanup
+#         if: always()
+#         run: |
+#           # Remove task definition files containing secrets
+#           rm -f *-current-td.json *-new-td.json
+#           echo "🧹 Cleaned up temporary files"
 
-  # ========================================
-  # STAGE 3: POST DEPLOYMENT
-  # ========================================
-  post-deploy:
-    name: 📊 Post Deployment
-    needs: [setup, deploy]
-    runs-on: ubuntu-latest
-    if: success()
+#   # ========================================
+#   # STAGE 3: POST DEPLOYMENT
+#   # ========================================
+#   post-deploy:
+#     name: 📊 Post Deployment
+#     needs: [setup, deploy]
+#     runs-on: ubuntu-latest
+#     if: success()
     
-    steps:
-      - name: 📊 Deployment Summary
-        run: |
-          echo "🎉 **CUBEJS ECS DEPLOYMENT COMPLETED**"
-          echo "========================================="
-          echo "Environment: ${{ inputs.environment }}"
-          echo "Image Tag: ${{ inputs.image_tag }}"
-          echo "AWS Region: ${{ needs.setup.outputs.aws-region }}"
-          echo "ECS Cluster: ${{ needs.deploy.outputs.ecs-cluster || 'N/A' }}"
-          echo "Deployment Time: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          echo ""
-          echo "🧊 **CubeJS ECS Services Deployed:**"
-          echo "✅ Cube API Service"
-          echo "✅ Cube Refresh Worker Service"
-          echo "✅ Cubestore Router Service"
-          echo "✅ Cubestore Worker Service"
-          echo ""
-          echo "🔗 **ECS Access Information:**"
-          echo "aws ecs describe-services --cluster \$CLUSTER_NAME --services \$SERVICE_NAME"
-          echo "aws ecs describe-tasks --cluster \$CLUSTER_NAME --tasks \$TASK_ARN"
-          echo "aws logs tail /ecs/cube-api --follow"
-          echo ""
-          echo "✅ Deployment successful in ${{ inputs.environment }} environment!"
+#     steps:
+#       - name: 📊 Deployment Summary
+#         run: |
+#           echo "🎉 **CUBEJS ECS DEPLOYMENT COMPLETED**"
+#           echo "========================================="
+#           echo "Environment: ${{ inputs.environment }}"
+#           echo "Image Tag: ${{ inputs.image_tag }}"
+#           echo "AWS Region: ${{ needs.setup.outputs.aws-region }}"
+#           echo "ECS Cluster: ${{ needs.deploy.outputs.ecs-cluster || 'N/A' }}"
+#           echo "Deployment Time: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+#           echo ""
+#           echo "🧊 **CubeJS ECS Services Deployed:**"
+#           echo "✅ Cube API Service"
+#           echo "✅ Cube Refresh Worker Service"
+#           echo "✅ Cubestore Router Service"
+#           echo "✅ Cubestore Worker Service"
+#           echo ""
+#           echo "🔗 **ECS Access Information:**"
+#           echo "aws ecs describe-services --cluster \$CLUSTER_NAME --services \$SERVICE_NAME"
+#           echo "aws ecs describe-tasks --cluster \$CLUSTER_NAME --tasks \$TASK_ARN"
+#           echo "aws logs tail /ecs/cube-api --follow"
+#           echo ""
+#           echo "✅ Deployment successful in ${{ inputs.environment }} environment!"

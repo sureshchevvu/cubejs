@@ -1,158 +1,158 @@
-# Multi-Environment CubeJS Build & Push Workflow
+# # Multi-Environment CubeJS Build & Push Workflow
 
-on:
-  push:
-    branches:
-      - edbwe_dev
-      - non-prod
-      - prod
-    paths-ignore:
-      - "**/*.md"
-      - ".github/*"
-      - ".gitignore"
-      - "*.config.js"
+# on:
+#   push:
+#     branches:
+#       - edbwe_dev
+#       - non-prod
+#       - prod
+#     paths-ignore:
+#       - "**/*.md"
+#       - ".github/*"
+#       - ".gitignore"
+#       - "*.config.js"
 
-  pull_request:
-    branches: [ edbwe_dev ]
-    types: [closed]
-    paths-ignore:
-      - "**/*.md"
-      - ".github/*"
-      - ".gitignore"
-      - "*.config.js"
+#   pull_request:
+#     branches: [ edbwe_dev ]
+#     types: [closed]
+#     paths-ignore:
+#       - "**/*.md"
+#       - ".github/*"
+#       - ".gitignore"
+#       - "*.config.js"
 
-  release:
-    types: [prereleased, released]
+#   release:
+#     types: [prereleased, released]
 
-jobs:
-  dispatch:
-    name: 🔧 Environment Setup
-    runs-on: ubuntu-latest
-    outputs:
-      environment: ${{ steps.env-config.outputs.ENVIRONMENT }}
-      build-id: ${{ steps.generate-id.outputs.unique-id }}
-    steps:
-      - name: 🎲 Generate Build ID
-        id: generate-id
-        run: |
-          BUILD_ID="${{ github.run_number }}"
-          echo "unique-id=$BUILD_ID" >> $GITHUB_OUTPUT
+# jobs:
+#   dispatch:
+#     name: 🔧 Environment Setup
+#     runs-on: ubuntu-latest
+#     outputs:
+#       environment: ${{ steps.env-config.outputs.ENVIRONMENT }}
+#       build-id: ${{ steps.generate-id.outputs.unique-id }}
+#     steps:
+#       - name: 🎲 Generate Build ID
+#         id: generate-id
+#         run: |
+#           BUILD_ID="${{ github.run_number }}"
+#           echo "unique-id=$BUILD_ID" >> $GITHUB_OUTPUT
 
-      - name: 🔧 Determine Environment
-        id: env-config
-        run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
-              ENVIRONMENT="non-prod"
-              echo "ENVIRONMENT=non-prod" >> $GITHUB_OUTPUT
-            else
-              ENVIRONMENT="prod"
-              echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
-            fi
-          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
-            ENVIRONMENT="edbwe_dev"
-            echo "ENVIRONMENT=edbwe_dev" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            BRANCH="${{ github.ref_name }}"
-            case $BRANCH in
-              "edbwe_dev") ENVIRONMENT="edbwe_dev" ;;
-              "non-prod") ENVIRONMENT="non-prod" ;;
-              "prod") ENVIRONMENT="prod" ;;
-              *) echo "❌ Unknown branch: $BRANCH"; exit 1 ;;
-            esac
-            echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Workflow should not run - PR was closed but not merged"
-            exit 1
-          fi
+#       - name: 🔧 Determine Environment
+#         id: env-config
+#         run: |
+#           if [[ "${{ github.event_name }}" == "release" ]]; then
+#             if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+#               ENVIRONMENT="non-prod"
+#               echo "ENVIRONMENT=non-prod" >> $GITHUB_OUTPUT
+#             else
+#               ENVIRONMENT="prod"
+#               echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
+#             fi
+#           elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
+#             ENVIRONMENT="edbwe_dev"
+#             echo "ENVIRONMENT=edbwe_dev" >> $GITHUB_OUTPUT
+#           elif [[ "${{ github.event_name }}" == "push" ]]; then
+#             BRANCH="${{ github.ref_name }}"
+#             case $BRANCH in
+#               "edbwe_dev") ENVIRONMENT="edbwe_dev" ;;
+#               "non-prod") ENVIRONMENT="non-prod" ;;
+#               "prod") ENVIRONMENT="prod" ;;
+#               *) echo "❌ Unknown branch: $BRANCH"; exit 1 ;;
+#             esac
+#             echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_OUTPUT
+#           else
+#             echo "❌ Workflow should not run - PR was closed but not merged"
+#             exit 1
+#           fi
 
-  build-and-push:
-    name: 🔨 Build & Push Images
-    needs: dispatch
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
+#   build-and-push:
+#     name: 🔨 Build & Push Images
+#     needs: dispatch
+#     runs-on: ubuntu-latest
+#     permissions:
+#       id-token: write
+#       contents: read
+#     steps:
+#       - name: 📥 Checkout Code
+#         uses: actions/checkout@v4
 
-      # Configure AWS credentials for each target environment
-      - name: 🔐 Configure AWS credentials (edbwe_dev)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.DISCOVERY_AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.DISCOVERY_AWS_REGION }}
-        if: ${{ needs.dispatch.outputs.environment == 'edbwe_dev' }}
+#       # Configure AWS credentials for each target environment
+#       - name: 🔐 Configure AWS credentials (edbwe_dev)
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.DISCOVERY_AWS_ROLE_TO_ASSUME }}
+#           aws-region: ${{ secrets.DISCOVERY_AWS_REGION }}
+#         if: ${{ needs.dispatch.outputs.environment == 'edbwe_dev' }}
 
-      - name: 🔐 Configure AWS credentials (Non-Prod)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.NP_AWS_REGION }}
-        if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
+#       - name: 🔐 Configure AWS credentials (Non-Prod)
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
+#           aws-region: ${{ secrets.NP_AWS_REGION }}
+#         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
 
-      - name: 🔐 Configure AWS credentials (Prod)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.PROD_AWS_REGION }}
-        if: ${{ needs.dispatch.outputs.environment == 'prod' }}
+#       - name: 🔐 Configure AWS credentials (Prod)
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
+#           aws-region: ${{ secrets.PROD_AWS_REGION }}
+#         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
 
-      - name: 🔑 ECR Login
-        uses: aws-actions/amazon-ecr-login@v2
+#       - name: 🔑 ECR Login
+#         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: 🔨 Build & Push All Cube Images
-        env:
-          ENVIRONMENT: ${{ needs.dispatch.outputs.environment }}
-          BUILD_ID: ${{ needs.dispatch.outputs.build-id }}
-        run: |
-          set -euo pipefail
+#       - name: 🔨 Build & Push All Cube Images
+#         env:
+#           ENVIRONMENT: ${{ needs.dispatch.outputs.environment }}
+#           BUILD_ID: ${{ needs.dispatch.outputs.build-id }}
+#         run: |
+#           set -euo pipefail
 
-          # Determine environment-specific settings
-          case "$ENVIRONMENT" in
-            edbwe_dev)
-              AWS_ACCOUNT_ID='${{ secrets.DISCOVERY_AWS_ACCOUNT_ID }}'
-              REGION='${{ secrets.DISCOVERY_AWS_REGION }}'
-              CUBE_REPO='${{ secrets.DISCOVERY_CUBE_ECR_REPO }}'
-              CUBESTORE_REPO='${{ secrets.DISCOVERY_CUBESTORE_ECR_REPO }}'
-              ;;
-            non-prod)
-              AWS_ACCOUNT_ID='${{ secrets.NP_AWS_ACCOUNT_ID }}'
-              REGION='${{ secrets.NP_AWS_REGION }}'
-              CUBE_REPO='${{ secrets.NP_CUBE_ECR_REPO }}'
-              CUBESTORE_REPO='${{ secrets.NP_CUBESTORE_ECR_REPO }}'
-              ;;
-            prod)
-              AWS_ACCOUNT_ID='${{ secrets.PROD_AWS_ACCOUNT_ID }}'
-              REGION='${{ secrets.PROD_AWS_REGION }}'
-              CUBE_REPO='${{ secrets.PROD_CUBE_ECR_REPO }}'
-              CUBESTORE_REPO='${{ secrets.PROD_CUBESTORE_ECR_REPO }}'
-              ;;
-            *) 
-              echo "❌ Unknown environment: $ENVIRONMENT"
-              exit 1
-              ;;
-          esac
+#           # Determine environment-specific settings
+#           case "$ENVIRONMENT" in
+#             edbwe_dev)
+#               AWS_ACCOUNT_ID='${{ secrets.DISCOVERY_AWS_ACCOUNT_ID }}'
+#               REGION='${{ secrets.DISCOVERY_AWS_REGION }}'
+#               CUBE_REPO='${{ secrets.DISCOVERY_CUBE_ECR_REPO }}'
+#               CUBESTORE_REPO='${{ secrets.DISCOVERY_CUBESTORE_ECR_REPO }}'
+#               ;;
+#             non-prod)
+#               AWS_ACCOUNT_ID='${{ secrets.NP_AWS_ACCOUNT_ID }}'
+#               REGION='${{ secrets.NP_AWS_REGION }}'
+#               CUBE_REPO='${{ secrets.NP_CUBE_ECR_REPO }}'
+#               CUBESTORE_REPO='${{ secrets.NP_CUBESTORE_ECR_REPO }}'
+#               ;;
+#             prod)
+#               AWS_ACCOUNT_ID='${{ secrets.PROD_AWS_ACCOUNT_ID }}'
+#               REGION='${{ secrets.PROD_AWS_REGION }}'
+#               CUBE_REPO='${{ secrets.PROD_CUBE_ECR_REPO }}'
+#               CUBESTORE_REPO='${{ secrets.PROD_CUBESTORE_ECR_REPO }}'
+#               ;;
+#             *) 
+#               echo "❌ Unknown environment: $ENVIRONMENT"
+#               exit 1
+#               ;;
+#           esac
 
-          ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+#           ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 
-          # Create repo if not exists
-          for REPO in "$CUBE_REPO" "$CUBESTORE_REPO"; do
-            if ! aws ecr describe-repositories --repository-names "$REPO" >/edbwe_dev/null 2>&1; then
-              echo "📦 Creating ECR repository: $REPO"
-              aws ecr create-repository --repository-name "$REPO" --image-scanning-configuration scanOnPush=true
-            fi
-          done
+#           # Create repo if not exists
+#           for REPO in "$CUBE_REPO" "$CUBESTORE_REPO"; do
+#             if ! aws ecr describe-repositories --repository-names "$REPO" >/edbwe_dev/null 2>&1; then
+#               echo "📦 Creating ECR repository: $REPO"
+#               aws ecr create-repository --repository-name "$REPO" --image-scanning-configuration scanOnPush=true
+#             fi
+#           done
 
-          # Build and push CubeJS API
-          docker build -t "${ECR_URI}/${CUBE_REPO}:${ENVIRONMENT}-${BUILD_ID}" -t "${ECR_URI}/${CUBE_REPO}:latest" ./cubejs/cube
-          docker push "${ECR_URI}/${CUBE_REPO}:${ENVIRONMENT}-${BUILD_ID}"
-          docker push "${ECR_URI}/${CUBE_REPO}:latest"
+#           # Build and push CubeJS API
+#           docker build -t "${ECR_URI}/${CUBE_REPO}:${ENVIRONMENT}-${BUILD_ID}" -t "${ECR_URI}/${CUBE_REPO}:latest" ./cubejs/cube
+#           docker push "${ECR_URI}/${CUBE_REPO}:${ENVIRONMENT}-${BUILD_ID}"
+#           docker push "${ECR_URI}/${CUBE_REPO}:latest"
 
-          # Build and push CubeStore
-          docker build -t "${ECR_URI}/${CUBESTORE_REPO}:${ENVIRONMENT}-${BUILD_ID}" -t "${ECR_URI}/${CUBESTORE_REPO}:latest" ./cubejs/cubestore
-          docker push "${ECR_URI}/${CUBESTORE_REPO}:${ENVIRONMENT}-${BUILD_ID}"
-          docker push "${ECR_URI}/${CUBESTORE_REPO}:latest"
+#           # Build and push CubeStore
+#           docker build -t "${ECR_URI}/${CUBESTORE_REPO}:${ENVIRONMENT}-${BUILD_ID}" -t "${ECR_URI}/${CUBESTORE_REPO}:latest" ./cubejs/cubestore
+#           docker push "${ECR_URI}/${CUBESTORE_REPO}:${ENVIRONMENT}-${BUILD_ID}"
+#           docker push "${ECR_URI}/${CUBESTORE_REPO}:latest"
 
-          echo "✅ Images built and pushed to ECR with tags: ${ENVIRONMENT}-${BUILD_ID} and latest"
+#           echo "✅ Images built and pushed to ECR with tags: ${ENVIRONMENT}-${BUILD_ID} and latest"
