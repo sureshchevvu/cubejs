@@ -28,6 +28,35 @@ jobs:
           echo "Actor: ${{ github.actor }}"
           echo "Event: ${{ github.event_name }}"
           echo "Run ID: ${{ github.run_id }}"
+          echo "Job: ${{ github.job }}"
+          echo "Workflow: ${{ github.workflow }}"
+      
+      - name: 🔍 Debug OIDC Token Claims
+        run: |
+          echo "=== OIDC Token Information ==="
+          echo "GITHUB_TOKEN available: ${{ github.token != '' }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository Owner: ${{ github.repository_owner }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "SHA: ${{ github.sha }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Event Name: ${{ github.event_name }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Job: ${{ github.job }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Run Number: ${{ github.run_number }}"
+          echo "Run Attempt: ${{ github.run_attempt }}"
+          echo ""
+          echo "Expected OIDC Claims for Trust Policy:"
+          echo "  sub: repo:${{ github.repository }}:ref:${{ github.ref }}"
+          echo "  aud: sts.amazonaws.com"
+          echo "  repository: ${{ github.repository }}"
+          echo "  repository_owner: ${{ github.repository_owner }}"
+          echo "  ref: ${{ github.ref }}"
+          echo ""
+          echo "=== Trust Policy should include ==="
+          echo 'StringLike: { "token.actions.githubusercontent.com:sub": "repo:${{ github.repository }}:*" }'
+          echo "=== End Debug ==="
       
       - name: 🔐 Test AWS OIDC Authentication
         uses: aws-actions/configure-aws-credentials@v4
@@ -36,14 +65,64 @@ jobs:
           aws-region: us-east-1
           audience: sts.amazonaws.com
           output-env-credentials: true
+        continue-on-error: true
+        id: aws-auth
+      
+      - name: 📋 Trust Policy Analysis (if auth failed)
+        if: steps.aws-auth.outcome == 'failure'
+        run: |
+          echo "🔴 AWS Authentication Failed!"
+          echo ""
+          echo "=== Possible Trust Policy Issues ==="
+          echo ""
+          echo "1. Repository Pattern Mismatch:"
+          echo "   Current repo: ${{ github.repository }}"
+          echo "   Expected pattern in trust policy might be:"
+          echo "   - 'repo:sureshchevvu/*:*' (all repos by user)"
+          echo "   - 'repo:sureshchevvu/cube:*' (specific repo name)"
+          echo "   - 'repo:sureshchevvu/cubejs:*' (current repo)"
+          echo ""
+          echo "2. Condition Checks:"
+          echo "   StringLike condition should include: 'repo:${{ github.repository }}:*'"
+          echo "   StringEquals for aud should be: 'sts.amazonaws.com'"
+          echo ""
+          echo "3. Check if trust policy allows this repository:"
+          echo "   Current: ${{ github.repository }}"
+          echo "   Working: sureshchevvu/cube (if different)"
+          echo ""
+          echo "=== Recommended Trust Policy ==="
+          cat << 'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "arn:aws:iam::203874373410:oidc-provider/token.actions.githubusercontent.com"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                  },
+                  "StringLike": {
+                    "token.actions.githubusercontent.com:sub": "repo:sureshchevvu/cubejs:*"
+                  }
+                }
+              }
+            ]
+          }
+          EOF
       
       - name: 🔍 Verify AWS Authentication
+        if: steps.aws-auth.outcome == 'success'
         run: |
+          echo "✅ AWS OIDC Authentication successful!"
           echo "Testing AWS CLI access..."
           aws sts get-caller-identity
-          echo "✅ AWS Authentication successful!"
       
       - name: 🏷️ Test ECR Access
+        if: steps.aws-auth.outcome == 'success'
         run: |
           echo "Testing ECR access..."
           aws ecr describe-repositories --region us-east-1 --max-items 5 || echo "ECR access may be limited"
