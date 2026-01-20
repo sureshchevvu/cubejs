@@ -58,13 +58,11 @@ jobs:
           echo 'StringLike: { "token.actions.githubusercontent.com:sub": "repo:${{ github.repository }}:*" }'
           echo "=== End Debug ==="
       
-      - name: 🔐 Test AWS OIDC Authentication
+      - name: 🔐 Configure AWS credentials (Dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
-          aws-region: us-east-1
-          audience: sts.amazonaws.com
-          output-env-credentials: true
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.DEV_AWS_REGION }}
         continue-on-error: true
         id: aws-auth
       
