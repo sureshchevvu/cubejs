@@ -172,6 +172,30 @@ jobs:
           echo "Job: ${{ github.job }}"
           echo "Workflow: ${{ github.workflow }}"
       
+      - name: 🔍 Verify Secrets Before Authentication
+        run: |
+          echo "=== Repository Secret Validation ==="
+          echo "Environment detected: ${{ needs.dispatch.outputs.environment }}"
+          if [ "${{ needs.dispatch.outputs.environment }}" = "dev" ]; then
+            if [ -z "$DEV_ROLE" ]; then
+              echo "❌ CRITICAL: DEV_AWS_ROLE_TO_ASSUME secret is NOT SET"
+              echo "Please configure this secret in your repository settings"
+              exit 1
+            else
+              echo "✅ DEV_AWS_ROLE_TO_ASSUME secret is configured"
+            fi
+            if [ -z "$DEV_REGION" ]; then
+              echo "❌ CRITICAL: DEV_AWS_REGION secret is NOT SET"
+              exit 1
+            else
+              echo "✅ DEV_AWS_REGION: $DEV_REGION"
+            fi
+          fi
+          echo "=== Proceeding to AWS Authentication ==="
+        env:
+          DEV_ROLE: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
+          DEV_REGION: ${{ secrets.DEV_AWS_REGION }}
+      
       - name: �🔐 Configure AWS credentials (Dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
