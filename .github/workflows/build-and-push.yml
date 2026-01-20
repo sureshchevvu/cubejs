@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - dev                # Dev environment
+      - edbwe_dev          # Dev environment (EDBWE branch)
       - non-prod           # Non-Prod environment
       - prod               # Prod environment
     paths-ignore:
@@ -16,6 +17,7 @@ on:
   pull_request:
     branches:
       - dev
+      - edbwe_dev
     types: [closed]
     paths-ignore:
       - "**/*.md"
@@ -107,7 +109,7 @@ jobs:
             echo "🌿 Branch: $BRANCH"
             
             case $BRANCH in
-              "dev") 
+              "dev"|"edbwe_dev") 
                 echo "ENVIRONMENT=dev" >> $GITHUB_OUTPUT
                 echo "🔵 Environment: Dev"
                 ;;
