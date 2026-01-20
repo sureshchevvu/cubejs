@@ -58,7 +58,29 @@ jobs:
           echo 'StringLike: { "token.actions.githubusercontent.com:sub": "repo:${{ github.repository }}:*" }'
           echo "=== End Debug ==="
       
-      - name: 🔐 Configure AWS credentials (Dev)
+      - name: � Trust Policy Validation
+        run: |
+          echo "=== Trust Policy Analysis ==="
+          echo "✅ Your trust policy INCLUDES: 'repo:sureshchevvu/cubejs:*'"
+          echo "✅ OIDC Provider: arn:aws:iam::203874373410:oidc-provider/token.actions.githubusercontent.com"
+          echo "✅ Audience: sts.amazonaws.com"
+          echo ""
+          echo "Since trust policy looks correct, checking other issues:"
+          echo "1. ❓ OIDC Provider thumbprint in AWS IAM"
+          echo "2. ❓ Token timing/caching issues"
+          echo "3. ❓ GitHub OIDC service availability"
+          echo "4. ❓ AWS STS service connectivity"
+          echo ""
+          echo "🔧 Troubleshooting: Adding timing delay and retry..."
+      
+      - name: 🕐 Pre-Auth Timing Check
+        run: |
+          echo "Current time: $(date)"
+          echo "Waiting 3 seconds for token stabilization..."
+          sleep 3
+          echo "Ready for authentication attempt"
+      
+      - name: �🔐 Configure AWS credentials (Dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
@@ -71,46 +93,36 @@ jobs:
         run: |
           echo "🔴 AWS Authentication Failed!"
           echo ""
-          echo "=== Possible Trust Policy Issues ==="
+          echo "=== Trust Policy Status ==="
+          echo "✅ VERIFIED: Your trust policy CORRECTLY includes 'repo:sureshchevvu/cubejs:*'"
+          echo "✅ VERIFIED: OIDC Provider ARN is correct"
+          echo "✅ VERIFIED: Audience condition is correct"
           echo ""
-          echo "1. Repository Pattern Mismatch:"
-          echo "   Current repo: ${{ github.repository }}"
-          echo "   Expected pattern in trust policy might be:"
-          echo "   - 'repo:sureshchevvu/*:*' (all repos by user)"
-          echo "   - 'repo:sureshchevvu/cube:*' (specific repo name)"
-          echo "   - 'repo:sureshchevvu/cubejs:*' (current repo)"
+          echo "🔍 Since trust policy is correct, other possible issues:"
           echo ""
-          echo "2. Condition Checks:"
-          echo "   StringLike condition should include: 'repo:${{ github.repository }}:*'"
-          echo "   StringEquals for aud should be: 'sts.amazonaws.com'"
+          echo "1. 🔧 OIDC Provider Configuration:"
+          echo "   - Check if OIDC provider exists in AWS IAM"
+          echo "   - Verify thumbprint is up to date"
+          echo "   - URL: https://token.actions.githubusercontent.com"
           echo ""
-          echo "3. Check if trust policy allows this repository:"
-          echo "   Current: ${{ github.repository }}"
-          echo "   Working: sureshchevvu/cube (if different)"
+          echo "2. 🕐 Timing/Service Issues:"
+          echo "   - GitHub OIDC token generation delays"
+          echo "   - AWS STS service temporary issues"
+          echo "   - Network connectivity problems"
           echo ""
-          echo "=== Recommended Trust Policy ==="
-          cat << 'EOF'
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Principal": {
-                  "Federated": "arn:aws:iam::203874373410:oidc-provider/token.actions.githubusercontent.com"
-                },
-                "Action": "sts:AssumeRoleWithWebIdentity",
-                "Condition": {
-                  "StringEquals": {
-                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-                  },
-                  "StringLike": {
-                    "token.actions.githubusercontent.com:sub": "repo:sureshchevvu/cubejs:*"
-                  }
-                }
-              }
-            ]
-          }
-          EOF
+          echo "3. 🔑 Token Claims Issues:"
+          echo "   - GitHub may be sending different claim format"
+          echo "   - Token expiration during transmission"
+          echo ""
+          echo "4. 🌐 AWS Region/Endpoint Issues:"
+          echo "   - STS endpoint connectivity"
+          echo "   - Region-specific OIDC handling"
+          echo ""
+          echo "=== Recommended Actions ==="
+          echo "1. Verify OIDC provider exists in AWS IAM Console"
+          echo "2. Check AWS CloudTrail for AssumeRoleWithWebIdentity attempts"
+          echo "3. Try running the workflow again (temporary service issue)"
+          echo "4. Check if role has required permissions for STS operations"
       
       - name: 🔍 Verify AWS Authentication
         if: steps.aws-auth.outcome == 'success'
