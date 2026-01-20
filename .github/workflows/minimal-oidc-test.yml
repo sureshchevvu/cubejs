@@ -65,12 +65,32 @@ jobs:
         continue-on-error: true
         id: alt-auth
         
-      - name: 📊 Alternative Test Result
+      - name: ✨ Test WORKING Pattern (v2 + mask-aws-account-id)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          aws-region: us-east-1
+          mask-aws-account-id: false
+        continue-on-error: true
+        id: working-pattern
+        
+      - name: 📊 Test Results Summary
         run: |
-          if [ "${{ steps.alt-auth.outcome }}" = "success" ]; then
-            echo "✅ Alternative config worked!"
+          echo "=== OIDC Authentication Test Results ==="
+          echo ""
+          echo "❌ v4 with full params: FAILED (as expected)"
+          echo "v4 alternative: ${{ steps.alt-auth.outcome }}"
+          echo "✅ v2 working pattern: ${{ steps.working-pattern.outcome }}"
+          echo ""
+          if [ "${{ steps.working-pattern.outcome }}" = "success" ]; then
+            echo "🎉 SUCCESS! Working pattern identified:"
+            echo "  - Use: aws-actions/configure-aws-credentials@v2"
+            echo "  - Parameters: role-to-assume, aws-region, mask-aws-account-id: false"
+            echo "  - Remove: audience, output-env-credentials"
+            echo ""
+            echo "✅ The issue was with action version and parameters!"
           else
-            echo "❌ Alternative config also failed"
+            echo "❌ Even working pattern failed - deeper AWS issue"
           fi
           
       - name: 🚨 Trust Policy Investigation
