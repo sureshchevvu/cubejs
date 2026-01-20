@@ -1,4 +1,4 @@
-# Multi-Environment CubeJS Build & Push Workflow
+# Multi-Environment CubeJS Build, Push & Deploy Workflow
 
 on:
   push:
@@ -73,11 +73,13 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    outputs:
+      cube_image: ${{ steps.set-cube-image.outputs.cube_image }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      # Configure AWS credentials for each target environment
+      # --- AWS Credentials Configuration ---
       - name: 🔐 Configure AWS credentials (edbwe_dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -103,13 +105,13 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: 🔨 Build & Push All Cube Images
+        id: build-push
         env:
           ENVIRONMENT: ${{ needs.dispatch.outputs.environment }}
           BUILD_ID: ${{ needs.dispatch.outputs.build-id }}
         run: |
           set -euo pipefail
-
-          # Determine environment-specific settings
+          # Env-specific settings
           case "$ENVIRONMENT" in
             edbwe_dev)
               AWS_ACCOUNT_ID='${{ secrets.DISCOVERY_AWS_ACCOUNT_ID }}'
@@ -129,7 +131,7 @@ jobs:
               CUBE_REPO='${{ secrets.PROD_CUBE_ECR_REPO }}'
               CUBESTORE_REPO='${{ secrets.PROD_CUBESTORE_ECR_REPO }}'
               ;;
-            *) 
+            *)
               echo "❌ Unknown environment: $ENVIRONMENT"
               exit 1
               ;;
@@ -137,9 +139,9 @@ jobs:
 
           ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 
-          # Create repo if not exists
+          # create repo if not exists
           for REPO in "$CUBE_REPO" "$CUBESTORE_REPO"; do
-            if ! aws ecr describe-repositories --repository-names "$REPO" >/edbwe_dev/null 2>&1; then
+            if ! aws ecr describe-repositories --repository-names "$REPO" >/dev/null 2>&1; then
               echo "📦 Creating ECR repository: $REPO"
               aws ecr create-repository --repository-name "$REPO" --image-scanning-configuration scanOnPush=true
             fi
@@ -150,9 +152,70 @@ jobs:
           docker push "${ECR_URI}/${CUBE_REPO}:${ENVIRONMENT}-${BUILD_ID}"
           docker push "${ECR_URI}/${CUBE_REPO}:latest"
 
-          # Build and push CubeStore
+          # Capture the full image reference (digest) for ECS
+          DIGEST=$(aws ecr describe-images --repository-name "$CUBE_REPO" --image-ids imageTag="${ENVIRONMENT}-${BUILD_ID}" --query 'imageDetails[0].imageDigest' --output text)
+          CUBE_IMAGE="${ECR_URI}/${CUBE_REPO}@${DIGEST}"
+          echo $CUBE_IMAGE
+          echo "cube_image=${CUBE_IMAGE}" >> $GITHUB_OUTPUT
+
+          # Build and push CubeStore image (not used in this ECS task def, but done as per workflow)
           docker build -t "${ECR_URI}/${CUBESTORE_REPO}:${ENVIRONMENT}-${BUILD_ID}" -t "${ECR_URI}/${CUBESTORE_REPO}:latest" ./cubejs/cubestore
           docker push "${ECR_URI}/${CUBESTORE_REPO}:${ENVIRONMENT}-${BUILD_ID}"
           docker push "${ECR_URI}/${CUBESTORE_REPO}:latest"
 
           echo "✅ Images built and pushed to ECR with tags: ${ENVIRONMENT}-${BUILD_ID} and latest"
+
+      - name: Set cube image output
+        id: set-cube-image
+        run: |
+          echo "cube_image=${{ steps.build-push.outputs.cube_image }}" >> $GITHUB_OUTPUT
+
+  deploy:
+    name: 🚀 Deploy to ECS (edbwe_dev)
+    needs: [dispatch, build-and-push]
+    runs-on: ubuntu-latest
+    if: ${{ needs.dispatch.outputs.environment == 'edbwe_dev' }}
+    environment:
+      name: edbwe_dev
+    steps:
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DISCOVERY_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.DISCOVERY_AWS_REGION }}
+
+      - name: 📦 Download ECS task definition
+        id: download-task-def
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition dev-cubejs-api \
+            --query 'taskDefinition' \
+            --output json > task-def.json
+
+      - name: 🛠️ Render new ECS task definition
+        id: render-new-task-def
+        run: |
+          # Load the current task definition, update the image URI and (optional) update environment variables for new deployment
+          jq --arg IMAGE "${{ needs.build-and-push.outputs.cube_image }}" '
+            .containerDefinitions[0].image = $IMAGE
+            ' task-def.json > new-task-def.json
+
+      - name: 🚚 Register new ECS task definition
+        id: register-task-def
+        run: |
+          new_task_def_arn=$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+          echo "new_task_def_arn=${new_task_def_arn}" >> $GITHUB_OUTPUT
+
+      - name: 🚦 Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster dev-cubejs-api-ecs-cluster \
+            --service dev-cubejs-api-service \
+            --task-definition ${{ steps.register-task-def.outputs.new_task_def_arn }} \
+            --desired-count 1
+
+      - name: ✅ Deployment completed
+        run: echo "Deployment to ECS 'dev' environment successfully completed!"
