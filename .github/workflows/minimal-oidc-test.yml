@@ -39,6 +39,23 @@ jobs:
           echo "- repo:sureshchevvu/cube:*"
           echo ""
           echo "Current token should match: repo:sureshchevvu/cubejs:*"
+          echo ""
+          echo "=== Pattern Analysis ==="
+          EXPECTED_PATTERN="repo:sureshchevvu/cubejs:"
+          ACTUAL_START="repo:${{ github.repository }}:"
+          echo "Trust policy pattern start: '$EXPECTED_PATTERN'"
+          echo "Actual token claim start:   '$ACTUAL_START'"
+          echo "Length of expected: ${#EXPECTED_PATTERN}"
+          echo "Length of actual:   ${#ACTUAL_START}"
+          echo ""
+          if [ "$EXPECTED_PATTERN" = "$ACTUAL_START" ]; then
+            echo "✅ Pattern prefixes match exactly"
+          else
+            echo "❌ Pattern prefixes DO NOT match"
+            echo "Checking character by character..."
+            echo "Expected (hex): $(echo -n '$EXPECTED_PATTERN' | xxd -p)"
+            echo "Actual (hex):   $(echo -n '$ACTUAL_START' | xxd -p)"
+          fi
           
       - name: 🧪 Test Alternative OIDC Configuration
         uses: aws-actions/configure-aws-credentials@v4
@@ -55,6 +72,49 @@ jobs:
           else
             echo "❌ Alternative config also failed"
           fi
+          
+      - name: 🚨 Trust Policy Investigation
+        run: |
+          echo "=== Trust Policy Analysis ==="
+          echo ""
+          echo "Since the pattern 'repo:sureshchevvu/cubejs:*' should match"
+          echo "'repo:sureshchevvu/cubejs:ref:refs/heads/edbwe_dev'"
+          echo "but authentication is failing, possible issues:"
+          echo ""
+          echo "1. 🔍 Hidden characters or encoding in trust policy"
+          echo "2. 🕐 Additional conditions in trust policy (like time-based)"
+          echo "3. 🔑 Role permissions missing STS:AssumeRoleWithWebIdentity"
+          echo "4. 🌐 AWS service-specific issues"
+          echo ""
+          echo "=== Recommended Actions ==="
+          echo "1. Test with working 'cube' repository for comparison"
+          echo "2. Check if role has basic STS permissions"
+          echo "3. Verify trust policy has no additional conditions"
+          echo "4. Check AWS CloudTrail for detailed failure reason"
+          echo ""
+          echo "Trust policy JSON should be EXACTLY:"
+          cat << 'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "arn:aws:iam::203874373410:oidc-provider/token.actions.githubusercontent.com"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                  },
+                  "StringLike": {
+                    "token.actions.githubusercontent.com:sub": "repo:sureshchevvu/cubejs:*"
+                  }
+                }
+              }
+            ]
+          }
+          EOF
     
       - name: Test Direct OIDC
         uses: aws-actions/configure-aws-credentials@v4
