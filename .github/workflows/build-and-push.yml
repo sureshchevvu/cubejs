@@ -192,12 +192,7 @@ jobs:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-build-non-prod
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.NP_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.NP_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -206,12 +201,7 @@ jobs:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-build-prod
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
       
       - name: 🔑 ECR Login
@@ -381,12 +371,7 @@ jobs:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-deploy-dev
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -395,12 +380,7 @@ jobs:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-deploy-non-prod
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.NP_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.NP_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -409,12 +389,7 @@ jobs:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-deploy-prod
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
 
       - name: 🔑 Retrieve Secrets from AWS Secrets Manager
@@ -697,12 +672,7 @@ jobs:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-wait-dev
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS credentials (Non-Prod)
@@ -711,12 +681,7 @@ jobs:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-wait-non-prod
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.NP_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.NP_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS credentials (Prod)
@@ -725,12 +690,7 @@ jobs:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-wait-prod
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
 
       - name: ⏳ Wait for All Services to Stabilize
@@ -810,12 +770,7 @@ jobs:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.DEV_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-verify-dev
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'dev' }}
       
       - name: 🔐 Configure AWS (Non-Prod)
@@ -824,12 +779,7 @@ jobs:
           role-to-assume: ${{ secrets.NP_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.NP_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-verify-non-prod
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.NP_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.NP_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'non-prod' }}
       
       - name: 🔐 Configure AWS (Prod)
@@ -838,12 +788,7 @@ jobs:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.PROD_AWS_REGION }}
           audience: sts.amazonaws.com
-          role-session-name: github-actions-cubejs-verify-prod
-          mask-aws-account-id: false
           output-env-credentials: true
-        env:
-          AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
-          AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
         if: ${{ needs.dispatch.outputs.environment == 'prod' }}
       
       - name: 🔍 Verify ${{ matrix.component }} Image
