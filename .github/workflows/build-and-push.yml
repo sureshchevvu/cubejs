@@ -328,6 +328,9 @@ jobs:
             --platform linux/amd64 \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             --build-arg ENVIRONMENT="$ENVIRONMENT" \
+            --build-arg VAULT_URL="${{ secrets.VAULT_URL }}" \
+            --build-arg VAULT_TOKEN="${{ secrets.VAULT_TOKEN }}" \
+            --build-arg VAULT_NAMESPACE="${{ secrets.VAULT_NAMESPACE }}" \
             --cache-from "$IMAGE_WITH_LATEST_TAG" \
             -f "$DOCKERFILE_PATH" \
             -t "$IMAGE_WITH_BUILD_TAG" \
