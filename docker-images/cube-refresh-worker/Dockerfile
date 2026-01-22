@@ -26,16 +26,15 @@ COPY scripts/ /cube/scripts/
 RUN chmod +x /cube/scripts/fetch-vault-secrets.py
 
 # Create startup script that fetches secrets before starting worker
-RUN cat > /cube/start.sh << 'EOF'
-#!/bin/bash
-set -e
-
-echo "🔐 Fetching secrets from vault..."
-python3 /cube/scripts/fetch-vault-secrets.py
-
-echo "🔄 Starting Cube Refresh Worker..."
-exec node index.js
-EOF
+RUN cat > /cube/start.sh << 'EOF' \
+&& echo '#!/bin/bash' >> /cube/start.sh \
+&& echo 'set -e' >> /cube/start.sh \
+&& echo '' >> /cube/start.sh \
+&& echo 'echo "🔐 Fetching secrets from vault..."' >> /cube/start.sh \
+&& echo 'python3 /cube/scripts/fetch-vault-secrets.py' >> /cube/start.sh \
+&& echo '' >> /cube/start.sh \
+&& echo 'echo "🔄 Starting Cube Refresh Worker..."' >> /cube/start.sh \
+&& echo 'exec node index.js' >> /cube/start.sh
 
 RUN chmod +x /cube/start.sh
 
