@@ -129,6 +129,32 @@ class VaultSecretsManager:
         
         return db_secrets
 
+    def fetch_redis_connection(self):
+        """Fetch Redis connection details for caching"""
+        secret_path = f"kv/data/breeding/{self.environment}/redis"
+        redis_secrets = self.fetch_secret(secret_path)
+        
+        if redis_secrets:
+            # Set Redis environment variables
+            redis_env_vars = {
+                'CUBEJS_REDIS_URL': redis_secrets.get('url'),
+                'CUBEJS_REDIS_PASSWORD': redis_secrets.get('password'),
+                'CUBEJS_REDIS_TLS': redis_secrets.get('tls', 'true'),
+                'REDIS_URL': redis_secrets.get('url'),  # Fallback format
+            }
+            
+            for key, value in redis_env_vars.items():
+                if value:
+                    os.environ[key] = str(value)
+                    logger.info(f"Set Redis environment variable: {key}")
+        else:
+            # Set default Redis configuration for local development
+            if self.environment == 'dev':
+                os.environ['CUBEJS_REDIS_URL'] = 'redis://localhost:6379'
+                logger.info("Set default Redis URL for development")
+        
+        return redis_secrets
+
 def main():
     """Main function to fetch all required secrets"""
     logger.info("🔐 Starting vault secrets fetch for CubeJS...")
@@ -152,10 +178,22 @@ def main():
     if db_secrets:
         logger.info("✅ Database connection configured")
     
+    # Fetch Redis connection details  
+    redis_secrets = vault_manager.fetch_redis_connection()
+    if redis_secrets:
+        logger.info("✅ Redis cache configured")
+    
     # Set additional CubeJS configuration
     os.environ['CUBEJS_WEB_SOCKETS'] = 'true'
     os.environ['CUBEJS_DEV_MODE'] = 'false' if vault_manager.environment == 'prod' else 'true'
     os.environ['CUBEJS_CACHE_AND_QUEUE_DRIVER'] = 'redis'
+    os.environ['CUBEJS_LOG_LEVEL'] = 'trace' if vault_manager.environment == 'dev' else 'info'
+    os.environ['CUBEJS_SCHEMA_PATH'] = '/cube/conf/schema'
+    os.environ['CUBEJS_TELEMETRY'] = 'false'
+    
+    # Set AWS region for BigQuery if available
+    if 'AWS_REGION' in os.environ:
+        os.environ['CUBEJS_AWS_REGION'] = os.environ['AWS_REGION']
     
     logger.info("🚀 All secrets fetched successfully!")
 

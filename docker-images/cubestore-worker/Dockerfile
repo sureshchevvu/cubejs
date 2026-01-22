@@ -6,6 +6,8 @@ ARG ENVIRONMENT
 ARG VAULT_URL
 ARG VAULT_TOKEN
 ARG VAULT_NAMESPACE
+ARG AWS_REGION
+ARG AWS_ACCOUNT_ID
 
 # Install Python and required packages for secrets management
 USER root
@@ -26,15 +28,15 @@ COPY scripts/ /cube/scripts/
 RUN chmod +x /cube/scripts/fetch-vault-secrets.py
 
 # Create startup script that fetches secrets before starting worker
-RUN cat > /cube/start.sh << 'EOF'
-#!/bin/bash
-set -e
-
-echo "🔐 Fetching secrets from vault..."
-python3 /cube/scripts/fetch-vault-secrets.py
-
-echo "👷 Starting Cubestore Worker..."
-exec cubestore
+RUN cat > /cube/start.sh << 'EOF' \
+#!/bin/bash \
+set -e \
+\
+echo "🔐 Fetching secrets from vault..." \
+python3 /cube/scripts/fetch-vault-secrets.py \
+\
+echo "👷 Starting Cubestore Worker..." \
+exec cubestore \
 EOF
 
 RUN chmod +x /cube/start.sh
@@ -50,6 +52,9 @@ ENV ENVIRONMENT=${ENVIRONMENT}
 ENV VAULT_URL=${VAULT_URL}
 ENV VAULT_TOKEN=${VAULT_TOKEN}
 ENV VAULT_NAMESPACE=${VAULT_NAMESPACE}
+ENV AWS_REGION=${AWS_REGION}
+ENV AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
+ENV AWS_DEFAULT_REGION=${AWS_REGION}
 
 # Environment variables specific to Cubestore Worker
 ENV CUBESTORE_WORKER_PORT=10001

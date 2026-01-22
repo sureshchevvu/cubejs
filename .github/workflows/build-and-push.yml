@@ -331,6 +331,8 @@ jobs:
             --build-arg VAULT_URL="${{ secrets.VAULT_URL }}" \
             --build-arg VAULT_TOKEN="${{ secrets.VAULT_TOKEN }}" \
             --build-arg VAULT_NAMESPACE="${{ secrets.VAULT_NAMESPACE }}" \
+            --build-arg AWS_REGION="$REGION" \
+            --build-arg AWS_ACCOUNT_ID="$AWS_ACCOUNT_ID" \
             --cache-from "$IMAGE_WITH_LATEST_TAG" \
             -f "$DOCKERFILE_PATH" \
             -t "$IMAGE_WITH_BUILD_TAG" \
