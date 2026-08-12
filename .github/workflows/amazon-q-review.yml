@@ -5,9 +5,9 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  id-token: write       # for OIDC auth to AWS
+  id-token: write
   contents: read
-  pull-requests: write  # to post inline comments
+  pull-requests: write
 
 jobs:
   q-code-review:
@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
@@ -26,4 +26,4 @@ jobs:
       - name: Amazon Q Developer Code Review
         uses: aws-actions/amazon-q-developer-code-review@v1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}  
+          github-token: ${{ secrets.GITHUB_TOKEN }}
