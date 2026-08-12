@@ -1,0 +1,29 @@
+name: Amazon Q Developer Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  id-token: write       # for OIDC auth to AWS
+  contents: read
+  pull-requests: write  # to post inline comments
+
+jobs:
+  q-code-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          aws-region: us-east-1
+
+      - name: Amazon Q Developer Code Review
+        uses: aws-actions/amazon-q-developer-code-review@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}  
