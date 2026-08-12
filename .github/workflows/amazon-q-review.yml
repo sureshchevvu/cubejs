@@ -22,6 +22,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: us-east-1
+          audience: sts.amazonaws.com
 
       - name: Amazon Q Developer Code Review
         uses: aws-actions/amazon-q-developer-code-review@v1
