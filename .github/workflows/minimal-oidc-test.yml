@@ -1,0 +1,156 @@
+name: Minimal OIDC Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - edbwe_dev
+
+jobs:
+  minimal-test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Debug Environment
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Testing OIDC authentication..."
+      
+      - name: 🔍 Debug OIDC Token Claims
+        run: |
+          echo "=== GitHub OIDC Token Analysis ==="
+          echo "Expected sub claim: repo:${{ github.repository }}:ref:${{ github.ref }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository Owner: ${{ github.repository_owner }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "SHA: ${{ github.sha }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Job: ${{ github.job }}"
+          echo ""
+          echo "Trust policy expects one of these patterns:"
+          echo "- repo:sureshchevvu/cubejs:*"
+          echo "- repo:sureshchevvu/cube:*"
+          echo ""
+          echo "Current token should match: repo:sureshchevvu/cubejs:*"
+          echo ""
+          echo "=== Pattern Analysis ==="
+          EXPECTED_PATTERN="repo:sureshchevvu/cubejs:"
+          ACTUAL_START="repo:${{ github.repository }}:"
+          echo "Trust policy pattern start: '$EXPECTED_PATTERN'"
+          echo "Actual token claim start:   '$ACTUAL_START'"
+          echo "Length of expected: ${#EXPECTED_PATTERN}"
+          echo "Length of actual:   ${#ACTUAL_START}"
+          echo ""
+          if [ "$EXPECTED_PATTERN" = "$ACTUAL_START" ]; then
+            echo "✅ Pattern prefixes match exactly"
+          else
+            echo "❌ Pattern prefixes DO NOT match"
+            echo "Checking character by character..."
+            echo "Expected (hex): $(echo -n '$EXPECTED_PATTERN' | xxd -p)"
+            echo "Actual (hex):   $(echo -n '$ACTUAL_START' | xxd -p)"
+          fi
+          
+      - name: 🧪 Test Alternative OIDC Configuration
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          aws-region: us-east-1
+        continue-on-error: true
+        id: alt-auth
+        
+      - name: ✨ Test WORKING Pattern (v2 + mask-aws-account-id)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          aws-region: us-east-1
+          mask-aws-account-id: false
+        continue-on-error: true
+        id: working-pattern
+        
+      - name: 📊 Test Results Summary
+        run: |
+          echo "=== OIDC Authentication Test Results ==="
+          echo ""
+          echo "❌ v4 with full params: FAILED (as expected)"
+          echo "v4 alternative: ${{ steps.alt-auth.outcome }}"
+          echo "✅ v2 working pattern: ${{ steps.working-pattern.outcome }}"
+          echo ""
+          if [ "${{ steps.working-pattern.outcome }}" = "success" ]; then
+            echo "🎉 SUCCESS! Working pattern identified:"
+            echo "  - Use: aws-actions/configure-aws-credentials@v2"
+            echo "  - Parameters: role-to-assume, aws-region, mask-aws-account-id: false"
+            echo "  - Remove: audience, output-env-credentials"
+            echo ""
+            echo "✅ The issue was with action version and parameters!"
+          else
+            echo "❌ Even working pattern failed - deeper AWS issue"
+          fi
+          
+      - name: 🚨 Trust Policy Investigation
+        run: |
+          echo "=== Trust Policy Analysis ==="
+          echo ""
+          echo "Since the pattern 'repo:sureshchevvu/cubejs:*' should match"
+          echo "'repo:sureshchevvu/cubejs:ref:refs/heads/edbwe_dev'"
+          echo "but authentication is failing, possible issues:"
+          echo ""
+          echo "1. 🔍 Hidden characters or encoding in trust policy"
+          echo "2. 🕐 Additional conditions in trust policy (like time-based)"
+          echo "3. 🔑 Role permissions missing STS:AssumeRoleWithWebIdentity"
+          echo "4. 🌐 AWS service-specific issues"
+          echo ""
+          echo "=== Recommended Actions ==="
+          echo "1. Test with working 'cube' repository for comparison"
+          echo "2. Check if role has basic STS permissions"
+          echo "3. Verify trust policy has no additional conditions"
+          echo "4. Check AWS CloudTrail for detailed failure reason"
+          echo ""
+          echo "Trust policy JSON should be EXACTLY:"
+          cat << 'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "arn:aws:iam::203874373410:oidc-provider/token.actions.githubusercontent.com"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                  },
+                  "StringLike": {
+                    "token.actions.githubusercontent.com:sub": "repo:sureshchevvu/cubejs:*"
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+    
+      - name: Test Direct OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          aws-region: us-east-1
+          audience: sts.amazonaws.com
+          output-env-credentials: true
+        continue-on-error: true
+        id: direct-oidc
+      
+      - name: Verify Success
+        run: |
+          if [ "${{ steps.direct-oidc.outcome }}" = "success" ]; then
+            aws sts get-caller-identity
+            echo "✅ Direct OIDC authentication successful!"
+          else
+            echo "❌ Direct OIDC authentication failed - check AWS trust policy and role permissions"
+          fi
