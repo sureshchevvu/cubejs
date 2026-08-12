@@ -20,7 +20,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::203874373410:role/breed-dii-gen-ai-infra-github-role
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_TO_ASSUME }}
           aws-region: us-east-1
 
       - name: Amazon Q Developer Code Review
